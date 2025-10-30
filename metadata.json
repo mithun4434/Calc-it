@@ -1,0 +1,7 @@
+{
+  "name": "AI Smart Calculator",
+  "description": "An intelligent calculator that solves math problems from text, uploaded images, or your device's camera, providing step-by-step solutions powered by AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
