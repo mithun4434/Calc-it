@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calc-it</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Dark Mode (Grayscale) */
+        --text-dark: #e5e5e5;
+        --text-dark-secondary: #a3a3a3;
+        --bg-dark-start: #171717;
+        --bg-dark-end: #262626;
+        --panel-dark-bg: rgba(38, 38, 38, 0.7);
+        --panel-dark-border: rgba(255, 255, 255, 0.1);
+
+        /* Light Mode (Grayscale) */
+        --text-light: #171717;
+        --text-light-secondary: #525252;
+        --bg-light-start: #e5e5e5;
+        --bg-light-end: #fafafa;
+        --panel-light-bg: rgba(250, 250, 250, 0.7);
+        --panel-light-border: rgba(0, 0, 0, 0.1);
+      }
+      
+      body {
+        font-family: 'Quicksand', sans-serif;
+        color: var(--text-dark);
+        overflow: hidden;
+        transition: color 0.4s ease-in-out, background 0.4s ease-in-out;
+        background: linear-gradient(to right, var(--bg-dark-start), var(--bg-dark-end));
+      }
+      .light body {
+        color: var(--text-light);
+        background: linear-gradient(to top, var(--bg-light-start), var(--bg-light-end));
+      }
+      
+      .glass-panel {
+        background: var(--panel-dark-bg);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid var(--panel-dark-border);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+        transition: background 0.4s ease, border 0.4s ease;
+      }
+      .light .glass-panel {
+        background: var(--panel-light-bg);
+        border: 1px solid var(--panel-light-border);
+      }
+      
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+      .light ::webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+      .light ::webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@capacitor/camera": "https://aistudiocdn.com/@capacitor/camera@^7.0.2",
+    "@capacitor/cli": "https://aistudiocdn.com/@capacitor/cli@^7.4.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script src="capacitor.js"></script>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
