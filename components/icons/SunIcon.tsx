@@ -1,9 +1,20 @@
 import React from 'react';
 
 const SunIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.95-4.243l-1.59-1.59M3 12h2.25m.386-6.364L5.05 7.05M12 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-    </svg>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 20 20"
+    fill="currentColor"
+    width="16"
+    height="16"
+    {...props}
+  >
+    <path
+      fillRule="evenodd"
+      d="M10 4.5a.75.75 0 0 1 .75.75v.75a.75.75 0 0 1-1.5 0V5.25A.75.75 0 0 1 10 4.5zm0 9.75a.75.75 0 0 1 .75.75v.75a.75.75 0 0 1-1.5 0V15a.75.75 0 0 1 .75-.75zm5.5-4.5a.75.75 0 0 1 .75.75v.75a.75.75 0 0 1-1.5 0V10.5a.75.75 0 0 1 .75-.75zM4.5 10a.75.75 0 0 1 .75.75v.75a.75.75 0 0 1-1.5 0v-.75A.75.75 0 0 1 4.5 10zm6.364-4.136a.75.75 0 0 1 1.06 1.06L11.06 8.79a.75.75 0 0 1-1.06-1.06l.864-.866zm-3.788 7.576a.75.75 0 0 1 1.06 1.06l-.866.866a.75.75 0 0 1-1.06-1.06l.866-.866zM6.576 6.576a.75.75 0 0 1 1.06-1.06l.866.866a.75.75 0 0 1-1.06 1.06l-.866-.866zm7.576 6.364a.75.75 0 0 1 1.06 1.06l-.866.866a.75.75 0 0 1-1.06-1.06l.866-.866zM10 7.25a2.75 2.75 0 1 1 0 5.5 2.75 2.75 0 0 1 0-5.5z"
+      clipRule="evenodd"
+    />
+  </svg>
 );
 
 export default SunIcon;
