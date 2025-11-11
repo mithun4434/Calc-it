@@ -1,0 +1,22 @@
+{
+  "name": "ai-smart-calculator",
+  "version": "1.0.0",
+  "description": "An intelligent calculator that solves math problems.",
+  "scripts": {
+    "sync": "npx cap sync",
+    "open": "npx cap open android"
+  },
+  "dependencies": {
+    "@google/genai": "^1.26.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@capacitor/core": "^6.1.1",
+    "@capacitor/android": "^6.1.1",
+    "@capacitor/camera": "^6.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.1"
+  },
+  "author": "",
+  "license": "ISC"
+}
