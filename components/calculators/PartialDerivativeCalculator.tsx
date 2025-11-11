@@ -1,0 +1,119 @@
+
+import React, { useState, useCallback } from 'react';
+import { solveProblem } from '../../services/geminiService';
+import { Solution } from '../../types';
+import Spinner from '../Spinner';
+import SolutionDisplay from '../SolutionDisplay';
+import InputWrapper from '../InputWrapper';
+import ScrollDownIcon from '../icons/ScrollDownIcon';
+
+const PartialDerivativeCalculator: React.FC = () => {
+    const [expression, setExpression] = useState('x^2*y + sin(y)');
+    const [respectTo, setRespectTo] = useState('x');
+    
+    const [solution, setSolution] = useState<Partial<Solution>>({});
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [problemStatement, setProblemStatement] = useState('');
+
+    const scrollToResults = () => {
+        document.getElementById('solution-display-container')?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!expression.trim() || !respectTo.trim()) {
+            setError("Function and 'respect to' variable cannot be empty.");
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setSolution({});
+        
+        const problemString = `Calculate the partial derivative of the function ${expression} with respect to the variable ${respectTo}.`;
+        setProblemStatement(`∂/∂${respectTo} (${expression})`);
+
+        try {
+            const result = await solveProblem(problemString);
+            setSolution(result);
+        } catch (err: any) {
+            setError(err.message || 'An unknown error occurred');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [expression, respectTo]);
+
+    const inputClasses = "bg-black/10 dark:bg-black/20 border border-current/10 rounded-2xl focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-colors";
+
+    return (
+        <div className="glass-panel w-full max-w-md mx-auto p-3 sm:p-4 space-y-4 rounded-3xl">
+            <h2 className="text-2xl font-bold text-center">Partial Derivative Calculator</h2>
+            <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                <div className="flex items-center gap-2">
+                     <div className="flex flex-col items-center">
+                        <span className="text-2xl opacity-70 font-serif italic">∂</span>
+                        <div className="border-t-2 border-current opacity-70 w-8 my-1"></div>
+                        <div className="flex">
+                            <span className="text-2xl opacity-70 font-serif italic">∂</span>
+                            <InputWrapper value={respectTo} onClear={() => setRespectTo('')} disabled={isLoading}>
+                                <input
+                                    type="text"
+                                    value={respectTo}
+                                    onChange={(e) => setRespectTo(e.target.value)}
+                                    className={`w-8 p-1 ml-1 text-center ${inputClasses}`}
+                                    maxLength={3}
+                                    disabled={isLoading}
+                                />
+                            </InputWrapper>
+                        </div>
+                    </div>
+                     <span className="text-4xl opacity-70 -mt-2">(</span>
+                    <div className="w-full">
+                        <InputWrapper value={expression} onClear={() => setExpression('')} disabled={isLoading}>
+                            <input
+                                type="text"
+                                value={expression}
+                                onChange={(e) => setExpression(e.target.value)}
+                                placeholder="f(x,y,...)"
+                                className={`w-full p-2 ${inputClasses}`}
+                                disabled={isLoading}
+                            />
+                        </InputWrapper>
+                    </div>
+                     <span className="text-4xl opacity-70 -mt-2">)</span>
+                </div>
+
+                <button
+                    type="submit"
+                    className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-3 px-4 rounded-2xl transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+                    disabled={isLoading || !expression.trim()}
+                >
+                    {isLoading ? <Spinner /> : 'Solve Partial Derivative'}
+                </button>
+                 {(isLoading || error || solution?.answer) && (
+                    <button 
+                        type="button" 
+                        onClick={scrollToResults}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-2xl bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 font-semibold transition-colors animate-pulse"
+                    >
+                       <ScrollDownIcon /> See Answer
+                    </button>
+                )}
+            </form>
+
+            {(isLoading || error || solution?.answer) && (
+                <div className="p-2 border-t border-current/10">
+                     <SolutionDisplay 
+                        problemStatement={problemStatement}
+                        solution={solution}
+                        isLoading={isLoading}
+                        error={error}
+                    />
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default PartialDerivativeCalculator;
