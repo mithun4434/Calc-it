@@ -1,7 +1,0 @@
-{
-  "name": "Calc-it",
-  "description": "An intelligent calculator that solves both math and physics problems from text, uploaded images, or your device's camera, providing step-by-step solutions powered by AI.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}
