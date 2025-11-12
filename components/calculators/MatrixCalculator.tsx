@@ -145,13 +145,13 @@ const MatrixCalculator: React.FC = () => {
             <h2 className="text-2xl font-bold text-center">Matrix</h2>
             <form onSubmit={handleSubmit} className="space-y-4 p-2">
                 
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 no-scrollbar">
                     {operations.map(op => (
                         <button
                             key={op.key}
                             type="button"
                             onClick={() => setOperation(op.key)}
-                            className={`px-2 py-2 text-sm font-semibold rounded-2xl transition-colors ${operation === op.key ? 'bg-black dark:bg-white text-white dark:text-black' : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20'}`}
+                            className={`flex-shrink-0 whitespace-nowrap px-4 py-2 text-sm font-semibold rounded-2xl transition-colors ${operation === op.key ? 'bg-black dark:bg-white text-white dark:text-black' : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20'}`}
                         >
                             {op.label}
                         </button>
