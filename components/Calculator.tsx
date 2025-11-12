@@ -7,7 +7,7 @@ import MatrixCalculator from './calculators/MatrixCalculator';
 import PartialDerivativeCalculator from './calculators/PartialDerivativeCalculator';
 import TemperatureConverter from './calculators/TemperatureConverter';
 import MoneyConverter from './calculators/MoneyConverter';
-import ChatbotTeacher from './calculators/ChatbotTeacher';
+import MITChat from './calculators/ChatbotTeacher';
 
 
 interface CalculatorProps {
@@ -29,8 +29,8 @@ const Calculator: React.FC<CalculatorProps> = ({ mode, onOpenSolver }) => {
             return <TemperatureConverter />;
         case 'moneyConverter':
             return <MoneyConverter />;
-        case 'chatbotTeacher':
-            return <ChatbotTeacher />;
+        case 'mit':
+            return <MITChat />;
         case 'standard':
         default:
             return <StandardCalculator onOpenSolver={onOpenSolver} />;
