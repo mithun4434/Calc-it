@@ -25,6 +25,14 @@
         --subtle-hover-bg: rgba(255, 255, 255, 0.1);
         --scrollbar-thumb: rgba(255, 255, 255, 0.25);
         --text-shadow-val: 0 1px 3px rgba(0,0,0,0.3);
+
+        /* NEW: body background variables */
+        --body-bg-color: transparent;
+        --body-bg-image: linear-gradient(135deg, var(--bg-start), var(--bg-mid), var(--bg-end));
+        --body-bg-size: 400% 400%;
+        --body-bg-position: center;
+        --body-bg-repeat: no-repeat;
+        --body-animation: gradientBG 25s ease infinite;
       }
 
       [data-theme="dusk"] {
@@ -322,13 +330,397 @@
           --scrollbar-thumb: rgba(255, 71, 71, 0.25);
       }
 
+      /* --- START AESTHETIC & TEXTURED THEMES --- */
+      [data-theme="grunge-paper"] {
+        --body-animation: none;
+        --body-bg-color: #fdf5e6;
+        --body-bg-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="0.1"/></svg>'),
+        linear-gradient(to right, rgba(186, 158, 130, 0.1), rgba(186, 158, 130, 0.2));
+        --panel-bg: rgba(245, 235, 215, 0.5);
+        --panel-border: rgba(139, 115, 95, 0.2);
+        --text-primary: #5a4430;
+        --text-secondary: #8b694b;
+        --accent-bg: #8d6e63;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(139, 115, 95, 0.05);
+        --subtle-hover-bg: rgba(139, 115, 95, 0.1);
+        --scrollbar-thumb: rgba(139, 115, 95, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="stitched-leather"] {
+        --body-animation: none;
+        --body-bg-color: #3d2b1f;
+        --body-bg-image:
+          repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0,0,0,0.3) 49px, rgba(0,0,0,0.3) 50px),
+          repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(0,0,0,0.3) 49px, rgba(0,0,0,0.3) 50px);
+        --panel-bg: rgba(40, 30, 20, 0.4);
+        --panel-border: rgba(210, 180, 140, 0.2);
+        --text-primary: #d2b48c;
+        --text-secondary: #a08462;
+        --accent-bg: #8b4513;
+        --accent-text: #f5f5dc;
+        --subtle-bg: rgba(210, 180, 140, 0.05);
+        --subtle-hover-bg: rgba(210, 180, 140, 0.1);
+        --scrollbar-thumb: rgba(210, 180, 140, 0.25);
+      }
+      [data-theme="cracked-earth"] {
+        --body-animation: none;
+        --body-bg-color: #8b4513;
+        --body-bg-image:
+          linear-gradient(135deg, #a0522d 25%, transparent 25%),
+          linear-gradient(225deg, #a0522d 25%, transparent 25%),
+          linear-gradient(45deg, #a0522d 25%, transparent 25%),
+          linear-gradient(315deg, #a0522d 25%, transparent 25%);
+        --body-bg-position: 10px 0, 10px 0, 0 0, 0 0;
+        --body-bg-size: 20px 20px;
+        --panel-bg: rgba(101, 67, 33, 0.4);
+        --panel-border: rgba(245, 222, 179, 0.2);
+        --text-primary: #f5deb3;
+        --text-secondary: #deb887;
+        --accent-bg: #cd853f;
+        --accent-text: #3d2b1f;
+        --subtle-bg: rgba(245, 222, 179, 0.05);
+        --subtle-hover-bg: rgba(245, 222, 179, 0.1);
+        --scrollbar-thumb: rgba(245, 222, 179, 0.25);
+      }
+      [data-theme="galactic-swirl"] {
+        --body-animation: none;
+        --body-bg-image: radial-gradient(circle at 20% 20%, #4a00e0, transparent 70%),
+                    radial-gradient(circle at 80% 80%, #8e2de2, transparent 70%),
+                    radial-gradient(circle at 50% 50%, #1f005c, #000000 70%);
+        --panel-bg: rgba(31, 0, 92, 0.3);
+        --panel-border: rgba(142, 45, 226, 0.3);
+        --text-primary: #f0f0ff;
+        --text-secondary: #c0c0ff;
+        --accent-bg: #8e2de2;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(240, 240, 255, 0.05);
+        --subtle-hover-bg: rgba(240, 240, 255, 0.1);
+        --scrollbar-thumb: rgba(240, 240, 255, 0.25);
+      }
+      [data-theme="liquid-metal"] {
+        --body-animation: none;
+        --body-bg-image: linear-gradient(160deg, #d3d3d3, #708090, #d3d3d3, #a9a9a9);
+        --panel-bg: rgba(169, 169, 169, 0.3);
+        --panel-border: rgba(255, 255, 255, 0.3);
+        --text-primary: #1c1c1c;
+        --text-secondary: #4a4a4a;
+        --accent-bg: #808080;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(28, 28, 28, 0.05);
+        --subtle-hover-bg: rgba(28, 28, 28, 0.1);
+        --scrollbar-thumb: rgba(28, 28, 28, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="crumpled-paper"] {
+        --body-animation: none;
+        --body-bg-color: #f1f1f1;
+        --body-bg-image:
+          linear-gradient(110deg, transparent 49.5%, rgba(0,0,0,0.1) 49.5%, rgba(0,0,0,0.1) 50.5%, transparent 50.5%),
+          linear-gradient(20deg, transparent 49.5%, rgba(0,0,0,0.1) 49.5%, rgba(0,0,0,0.1) 50.5%, transparent 50.5%);
+        --body-bg-size: 50px 30px;
+        --panel-bg: rgba(255, 255, 255, 0.6);
+        --panel-border: rgba(0, 0, 0, 0.1);
+        --text-primary: #333;
+        --text-secondary: #777;
+        --accent-bg: #a0a0a0;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(0, 0, 0, 0.03);
+        --subtle-hover-bg: rgba(0, 0, 0, 0.06);
+        --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+        --text-shadow-val: none;
+      }
+      [data-theme="rich-velvet"] {
+        --body-animation: none;
+        --body-bg-image: radial-gradient(ellipse at top, #800020, #2c000a), radial-gradient(ellipse at bottom, #800020, #000);
+        --panel-bg: rgba(72, 0, 18, 0.3);
+        --panel-border: rgba(255, 215, 0, 0.2);
+        --text-primary: #ffd700;
+        --text-secondary: #f0e68c;
+        --accent-bg: #b22222;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(255, 215, 0, 0.05);
+        --subtle-hover-bg: rgba(255, 215, 0, 0.1);
+        --scrollbar-thumb: rgba(255, 215, 0, 0.25);
+      }
+      [data-theme="rusted-metal"] {
+        --body-animation: none;
+        --body-bg-color: #7b3f00;
+        --body-bg-image:
+          radial-gradient(circle at 10% 20%, #b45f06 10%, transparent 50%),
+          radial-gradient(circle at 80% 70%, #a0522d 20%, transparent 60%),
+          radial-gradient(circle at 50% 50%, #808080 5%, transparent 20%);
+        --panel-bg: rgba(123, 63, 0, 0.3);
+        --panel-border: rgba(210, 105, 30, 0.2);
+        --text-primary: #e6e6e6;
+        --text-secondary: #cccccc;
+        --accent-bg: #d2691e;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(255, 255, 255, 0.05);
+        --subtle-hover-bg: rgba(255, 255, 255, 0.1);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+      }
+      [data-theme="holographic"] {
+        --body-animation: gradientBG 15s ease infinite;
+        --body-bg-image: linear-gradient(135deg, #ff00c1, #00fff2, #ffc600, #ff00c1);
+        --body-bg-size: 600% 600%;
+        --panel-bg: rgba(255, 255, 255, 0.1);
+        --panel-border: rgba(255, 255, 255, 0.3);
+        --text-primary: #ffffff;
+        --text-secondary: #eeeeee;
+        --accent-bg: #ffffff;
+        --accent-text: #000000;
+        --subtle-bg: rgba(255, 255, 255, 0.1);
+        --subtle-hover-bg: rgba(255, 255, 255, 0.2);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.3);
+        --text-shadow-val: 0 1px 5px rgba(0,0,0,0.4);
+      }
+      [data-theme="tartan-plaid"] {
+        --body-animation: none;
+        --body-bg-color: #a52a2a;
+        --body-bg-image:
+          repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px),
+          repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px),
+          linear-gradient(#f0e68c 2px, transparent 2px),
+          linear-gradient(90deg, #f0e68c 2px, transparent 2px);
+        --body-bg-size: 50px 50px, 50px 50px, 30px 30px, 30px 30px;
+        --panel-bg: rgba(139, 0, 0, 0.3);
+        --panel-border: rgba(240, 230, 140, 0.2);
+        --text-primary: #f0e68c;
+        --text-secondary: #fffacd;
+        --accent-bg: #b22222;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(240, 230, 140, 0.05);
+        --subtle-hover-bg: rgba(240, 230, 140, 0.1);
+        --scrollbar-thumb: rgba(240, 230, 140, 0.25);
+      }
+      [data-theme="camo"] {
+        --body-animation: none;
+        --body-bg-color: #556b2f;
+        --body-bg-image:
+          radial-gradient(circle at 10% 80%, #6b8e23 20%, transparent 20%),
+          radial-gradient(circle at 80% 30%, #8fbc8f 25%, transparent 25%),
+          radial-gradient(circle at 40% 50%, #2f4f4f 15%, transparent 15%);
+        --panel-bg: rgba(47, 79, 79, 0.3);
+        --panel-border: rgba(143, 188, 143, 0.2);
+        --text-primary: #f5f5f5;
+        --text-secondary: #d3d3d3;
+        --accent-bg: #8fbc8f;
+        --accent-text: #2f4f4f;
+        --subtle-bg: rgba(245, 245, 245, 0.05);
+        --subtle-hover-bg: rgba(245, 245, 245, 0.1);
+        --scrollbar-thumb: rgba(245, 245, 245, 0.25);
+      }
+      [data-theme="glitch"] {
+        --body-animation: none;
+        --body-bg-color: #000000;
+        --body-bg-image:
+          repeating-linear-gradient(0deg, rgba(0, 255, 255, 0.5) 0, rgba(0, 255, 255, 0.5) 1px, transparent 1px, transparent 5px),
+          repeating-linear-gradient(90deg, rgba(255, 0, 255, 0.5) 0, rgba(255, 0, 255, 0.5) 1px, transparent 1px, transparent 5px);
+        --body-bg-position: 2px 0, 0 3px;
+        --panel-bg: rgba(10, 10, 10, 0.4);
+        --panel-border: rgba(255, 255, 255, 0.2);
+        --text-primary: #ffffff;
+        --text-secondary: #bbbbbb;
+        --accent-bg: #ffffff;
+        --accent-text: #000000;
+        --subtle-bg: rgba(255, 255, 255, 0.05);
+        --subtle-hover-bg: rgba(255, 255, 255, 0.1);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+        --text-shadow-val: 2px 2px #ff00ff, -2px -2px #00ffff;
+      }
+      [data-theme="water-ripples"] {
+        --body-animation: none;
+        --body-bg-color: #87ceeb;
+        --body-bg-image:
+          radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 2px, transparent 3px),
+          radial-gradient(circle at 20% 80%, rgba(255,255,255,0.2) 2px, transparent 3px),
+          radial-gradient(circle at 80% 20%, rgba(255,255,255,0.2) 2px, transparent 3px);
+        --body-bg-size: 50px 50px;
+        --panel-bg: rgba(173, 216, 230, 0.3);
+        --panel-border: rgba(255, 255, 255, 0.3);
+        --text-primary: #00008b;
+        --text-secondary: #0000cd;
+        --accent-bg: #4682b4;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(0, 0, 139, 0.05);
+        --subtle-hover-bg: rgba(0, 0, 139, 0.1);
+        --scrollbar-thumb: rgba(0, 0, 139, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="art-deco"] {
+        --body-animation: none;
+        --body-bg-color: #0c0c0c;
+        --body-bg-image:
+          repeating-linear-gradient(30deg, transparent, transparent 15px, #d4af37 15px, #d4af37 17px),
+          repeating-linear-gradient(150deg, transparent, transparent 15px, #d4af37 15px, #d4af37 17px),
+          repeating-linear-gradient(90deg, transparent, transparent 15px, #d4af37 15px, #d4af37 17px);
+        --body-bg-size: 40px 70px;
+        --panel-bg: rgba(30, 30, 30, 0.4);
+        --panel-border: rgba(212, 175, 55, 0.3);
+        --text-primary: #e6e6e6;
+        --text-secondary: #cccccc;
+        --accent-bg: #d4af37;
+        --accent-text: #0c0c0c;
+        --subtle-bg: rgba(212, 175, 55, 0.05);
+        --subtle-hover-bg: rgba(212, 175, 55, 0.1);
+        --scrollbar-thumb: rgba(212, 175, 55, 0.25);
+      }
+      [data-theme="peeling-paint"] {
+        --body-animation: none;
+        --body-bg-color: #bdb76b;
+        --body-bg-image:
+          linear-gradient(45deg, #f0e68c 50%, transparent 50%),
+          linear-gradient(135deg, #f5f5dc 25%, transparent 25%);
+        --body-bg-size: 30px 30px;
+        --panel-bg: rgba(240, 230, 140, 0.3);
+        --panel-border: rgba(85, 107, 47, 0.2);
+        --text-primary: #556b2f;
+        --text-secondary: #6b8e23;
+        --accent-bg: #808000;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(85, 107, 47, 0.05);
+        --subtle-hover-bg: rgba(85, 107, 47, 0.1);
+        --scrollbar-thumb: rgba(85, 107, 47, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="pixel-sky"] {
+        --body-animation: none;
+        --body-bg-color: #87ceeb;
+        --body-bg-image: 
+          linear-gradient(white 2px, transparent 2px), 
+          linear-gradient(90deg, white 2px, transparent 2px);
+        --body-bg-size: 10px 10px, 10px 10px;
+        --body-bg-position: -2px -2px, -2px -2px;
+        --panel-bg: rgba(173, 216, 230, 0.4);
+        --panel-border: rgba(255, 255, 255, 0.3);
+        --text-primary: #191970;
+        --text-secondary: #4169e1;
+        --accent-bg: #ffffff;
+        --accent-text: #191970;
+        --subtle-bg: rgba(25, 25, 112, 0.05);
+        --subtle-hover-bg: rgba(25, 25, 112, 0.1);
+        --scrollbar-thumb: rgba(25, 25, 112, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="scribble-wall"] {
+        --body-animation: none;
+        --body-bg-color: #fafafa;
+        --body-bg-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='199' viewBox='0 0 100 199'%3E%3Cg fill='%23cccccc' fill-opacity='0.2'%3E%3Cpath d='M96 195.4c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM0 195.4c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 199.5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 151.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 151.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 155.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 107c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 107c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 111.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 62.8c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 62.8c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 66.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 18.6c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 18.6c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 22.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 177.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 177.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 133.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 133.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 88.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 88.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 44.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 44.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 .5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 .5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 40.6c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1S0 42.9 0 40.6zM96 40.6c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 44.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 84.8c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 84.8c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 88.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 129c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 129c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 133.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM0 173.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM96 173.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1s-4-1.8-4-4.1v-2.2zM48 177.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 22.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 22.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 66.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 66.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 111.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 111.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 155.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 155.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM24 199.5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM72 199.5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 .5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 4.6c-2.2 0-4-1.8-4-4.1V-1.7c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1V.5c0 2.3-1.8 4.1-4 4.1zM48 199.5c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 195.4c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 151.2c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 107c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 62.8c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 18.6c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 22.7c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 66.9c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 111.1c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 155.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1zM48 177.3c-2.2 0-4-1.8-4-4.1v-2.2c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1v2.2c0 2.3-1.8 4.1-4 4.1z%3C/g%3E%3C/svg%3E");
+        --panel-bg: rgba(255, 255, 255, 0.6);
+        --panel-border: rgba(0, 0, 0, 0.1);
+        --text-primary: #333;
+        --text-secondary: #777;
+        --accent-bg: #888;
+        --accent-text: #fff;
+        --subtle-bg: rgba(0, 0, 0, 0.03);
+        --subtle-hover-bg: rgba(0, 0, 0, 0.06);
+        --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+        --text-shadow-val: none;
+      }
+      [data-theme="bio-lume"] {
+        --body-animation: none;
+        --body-bg-color: #0a192f;
+        --body-bg-image:
+          radial-gradient(ellipse at 70% 20%, rgba(0, 229, 255, 0.2) 0%, transparent 50%),
+          radial-gradient(ellipse at 30% 80%, rgba(100, 255, 218, 0.2) 0%, transparent 50%);
+        --panel-bg: rgba(17, 34, 64, 0.4);
+        --panel-border: rgba(100, 255, 218, 0.2);
+        --text-primary: #ccd6f6;
+        --text-secondary: #8892b0;
+        --accent-bg: #64ffda;
+        --accent-text: #0a192f;
+        --subtle-bg: rgba(100, 255, 218, 0.05);
+        --subtle-hover-bg: rgba(100, 255, 218, 0.1);
+        --scrollbar-thumb: rgba(100, 255, 218, 0.25);
+        --text-shadow-val: 0 0 5px rgba(100, 255, 218, 0.5);
+      }
+      [data-theme="washi-paper"] {
+        --body-animation: none;
+        --body-bg-color: #f7f3e9;
+        --body-bg-image:
+          repeating-linear-gradient(175deg, transparent, transparent 1px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 3px),
+          repeating-linear-gradient(85deg, transparent, transparent 1px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 3px);
+        --panel-bg: rgba(240, 235, 220, 0.5);
+        --panel-border: rgba(160, 147, 128, 0.2);
+        --text-primary: #6b4f3a;
+        --text-secondary: #9e8a78;
+        --accent-bg: #8d6e63;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(139, 115, 95, 0.05);
+        --subtle-hover-bg: rgba(139, 115, 95, 0.1);
+        --scrollbar-thumb: rgba(139, 115, 95, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="dark-marble"] {
+        --body-animation: none;
+        --body-bg-color: #1a1a1a;
+        --body-bg-image: linear-gradient(135deg, rgba(200,200,200,0.1) 25%, transparent 25%),
+                        linear-gradient(225deg, rgba(200,200,200,0.1) 25%, transparent 25%),
+                        linear-gradient(45deg, rgba(200,200,200,0.1) 25%, transparent 25%),
+                        linear-gradient(315deg, rgba(200,200,200,0.1) 25%, transparent 25%);
+        --body-bg-position: 20px 0, 20px 0, 0 0, 0 0;
+        --body-bg-size: 40px 40px;
+        --body-bg-repeat: no-repeat;
+        --panel-bg: rgba(30, 30, 30, 0.4);
+        --panel-border: rgba(255, 255, 255, 0.15);
+        --text-primary: #e0e0e0;
+        --text-secondary: #b0b0b0;
+        --accent-bg: #c0c0c0;
+        --accent-text: #1a1a1a;
+        --subtle-bg: rgba(255, 255, 255, 0.05);
+        --subtle-hover-bg: rgba(255, 255, 255, 0.1);
+        --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+      }
+      [data-theme="zebra"] {
+        --body-animation: none;
+        --body-bg-color: #f5f5f5;
+        --body-bg-image: repeating-linear-gradient(-25deg, #222, #222 15px, transparent 15px, transparent 40px);
+        --panel-bg: rgba(255, 255, 255, 0.6);
+        --panel-border: rgba(0, 0, 0, 0.2);
+        --text-primary: #000000;
+        --text-secondary: #444444;
+        --accent-bg: #333333;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(0, 0, 0, 0.05);
+        --subtle-hover-bg: rgba(0, 0, 0, 0.1);
+        --scrollbar-thumb: rgba(0, 0, 0, 0.25);
+        --text-shadow-val: none;
+      }
+      [data-theme="leopard-print"] {
+        --body-animation: none;
+        --body-bg-color: #d2b48c;
+        --body-bg-image: 
+          radial-gradient(circle at 20% 20%, #8b4513 10px, transparent 11px),
+          radial-gradient(circle at 80% 80%, #a0522d 12px, transparent 13px),
+          radial-gradient(circle at 50% 70%, #8b4513 8px, transparent 9px),
+          radial-gradient(circle at 10% 90%, #a0522d 9px, transparent 10px),
+          radial-gradient(circle at 90% 10%, #8b4513 11px, transparent 12px);
+        --body-bg-size: 80px 80px;
+        --panel-bg: rgba(139, 69, 19, 0.2);
+        --panel-border: rgba(92, 64, 51, 0.3);
+        --text-primary: #5c4033;
+        --text-secondary: #805333;
+        --accent-bg: #8b4513;
+        --accent-text: #ffffff;
+        --subtle-bg: rgba(92, 64, 51, 0.05);
+        --subtle-hover-bg: rgba(92, 64, 51, 0.1);
+        --scrollbar-thumb: rgba(92, 64, 51, 0.25);
+        --text-shadow-val: none;
+      }
+      /* --- END AESTHETIC & TEXTURED THEMES --- */
+
+
       body {
         font-family: 'Quicksand', sans-serif;
         color: var(--text-primary);
         transition: color 0.4s ease-in-out, background 0.4s ease-in-out;
-        background: linear-gradient(135deg, var(--bg-start), var(--bg-mid), var(--bg-end));
-        background-size: 400% 400%;
-        animation: gradientBG 25s ease infinite;
+        background-color: var(--body-bg-color);
+        background-image: var(--body-bg-image);
+        background-size: var(--body-bg-size);
+        background-position: var(--body-bg-position);
+        background-repeat: var(--body-bg-repeat);
+        animation: var(--body-animation);
         text-shadow: var(--text-shadow-val, 0 1px 3px rgba(0,0,0,0.3));
       }
       
