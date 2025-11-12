@@ -91,7 +91,7 @@ const MatrixInputGrid: React.FC<MatrixInputGridProps> = ({
                                 type="number"
                                 value={cell}
                                 onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)}
-                                className="w-full text-center p-1 bg-black/5 dark:bg-black/10 border border-current/10 rounded-xl"
+                                className="w-full text-center p-1 bg-black/5 dark:bg-black/10 border border-current/10 rounded-xl font-mono"
                             />
                         </InputWrapper>
                     ))
