@@ -20,7 +20,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({ isOpen, onClose, onSelectMode, 
         { key: 'moneyConverter', label: 'Currency Converter' },
     ];
     
-    const chatbotMode = { key: 'chatbotTeacher' as const, label: 'ASK' };
+    const chatbotMode = { key: 'mit' as const, label: 'MIT' };
 
     return (
         <>
