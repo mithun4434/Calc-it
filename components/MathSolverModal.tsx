@@ -239,7 +239,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                                                     </div>
                                                     {solution.calculationSteps?.[index] && (
                                                         <div className="mt-2 pl-9">
-                                                            <p className="text-lg font-mono bg-black/10 dark:bg-black/30 p-2 rounded-lg text-center overflow-x-auto whitespace-nowrap">
+                                                            <p className="text-lg font-mono bg-black/10 dark:bg-black/30 py-2 px-3 rounded-lg text-left overflow-x-auto whitespace-nowrap">
                                                                 {solution.calculationSteps[index]}
                                                             </p>
                                                         </div>
