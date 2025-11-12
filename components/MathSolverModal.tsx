@@ -230,18 +230,20 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                                         <h3 className="text-sm font-semibold opacity-60 uppercase tracking-wider">Step-by-Step Solution</h3>
                                         <ul className="mt-3 space-y-3">
                                             {solution.steps.map((step, index) => (
-                                                <li key={index} className="flex items-start gap-3 p-3 bg-black/5 dark:bg-black/20 rounded-2xl">
-                                                    <div className="flex-shrink-0 h-6 w-6 bg-gray-500/20 border border-gray-500/30 text-current font-bold text-xs rounded-full flex items-center justify-center mt-1">
-                                                        {index + 1}
+                                                <li key={index} className="p-3 bg-black/5 dark:bg-black/20 rounded-2xl">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="flex-shrink-0 h-6 w-6 bg-gray-500/20 border border-gray-500/30 text-current font-bold text-xs rounded-full flex items-center justify-center mt-1">
+                                                            {index + 1}
+                                                        </div>
+                                                        <p className="flex-1 opacity-90 leading-relaxed">{step}</p>
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <p className="opacity-90 leading-relaxed">{step}</p>
-                                                        {solution.calculationSteps?.[index] && (
-                                                            <p className="mt-2 text-lg font-mono bg-black/10 dark:bg-black/30 p-2 rounded-lg text-center">
+                                                    {solution.calculationSteps?.[index] && (
+                                                        <div className="mt-2 pl-9">
+                                                            <p className="text-lg font-mono bg-black/10 dark:bg-black/30 p-2 rounded-lg text-center overflow-x-auto whitespace-nowrap">
                                                                 {solution.calculationSteps[index]}
                                                             </p>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>
