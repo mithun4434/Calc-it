@@ -16,14 +16,22 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
  * @returns The parsed JSON object.
  */
 function parseGeminiJsonResponse<T>(responseText: string): T {
-    const cleanedText = responseText.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    if (!cleanedText) {
+    let jsonString = responseText.trim();
+    
+    // Find and extract the JSON block if it's wrapped in markdown
+    const jsonBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch && jsonBlockMatch[1]) {
+        jsonString = jsonBlockMatch[1];
+    }
+
+    if (!jsonString) {
         throw new Error("AI returned an empty response.");
     }
+    
     try {
-        return JSON.parse(cleanedText);
+        return JSON.parse(jsonString);
     } catch (e) {
-        console.error("Failed to parse JSON response:", cleanedText, e);
+        console.error("Failed to parse JSON response:", jsonString, e);
         throw new Error("AI returned an invalid response format.");
     }
 }
