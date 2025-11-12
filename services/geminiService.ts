@@ -9,6 +9,26 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * Safely parses a JSON string from a Gemini response,
+ * stripping potential markdown code fences.
+ * @param responseText The raw text from the Gemini response.
+ * @returns The parsed JSON object.
+ */
+function parseGeminiJsonResponse<T>(responseText: string): T {
+    const cleanedText = responseText.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    if (!cleanedText) {
+        throw new Error("AI returned an empty response.");
+    }
+    try {
+        return JSON.parse(cleanedText);
+    } catch (e) {
+        console.error("Failed to parse JSON response:", cleanedText, e);
+        throw new Error("AI returned an invalid response format.");
+    }
+}
+
+
 const fileToGenerativePart = (base64Data: string, mimeType: string) => {
   return {
     inlineData: {
@@ -89,10 +109,12 @@ export async function solveProblem(problem: string): Promise<Solution> {
                 responseSchema: solutionSchema,
             },
         });
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
+        return parseGeminiJsonResponse<Solution>(response.text);
     } catch (e: any) {
         console.error("Error solving problem:", e);
+        if (e.message.includes("AI returned")) {
+            throw e; // Re-throw custom, user-friendly errors
+        }
         throw new Error("The AI failed to solve the problem. It might be too complex or malformed.");
     }
 }
@@ -168,10 +190,12 @@ export async function getCurrencyExchangeRate(amount: number, from: string, to: 
                 responseSchema: schema,
             },
         });
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
-    } catch (error) {
+        return parseGeminiJsonResponse<{ convertedAmount: number, exchangeRate: number, disclaimer:string }>(response.text);
+    } catch (error: any) {
         console.error("Error fetching currency exchange rate:", error);
+        if (error.message.includes("AI returned")) {
+            throw error; // Re-throw custom, user-friendly errors
+        }
         throw new Error("Failed to get currency conversion from AI. Please try again later.");
     }
 }
