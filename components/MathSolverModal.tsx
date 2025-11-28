@@ -40,6 +40,30 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
         setError(null);
         setStep('idle');
     }, []);
+    
+    // Clean up error messages for display
+    const formatErrorMessage = (err: any): string => {
+        const raw = err?.message || String(err);
+        
+        // Sometimes the service returns a specific "fallback" message we can show
+        if (raw.includes("Quota Exceeded")) {
+            return "We are experiencing high traffic (Quota Exceeded). Trying to reroute your request...";
+        }
+        
+        // Remove JSON garbage if it slipped through
+        if (raw.includes('{"') || raw.includes('"{')) {
+            try {
+                const match = raw.match(/(\{.*\})/);
+                if (match) {
+                     const parsed = JSON.parse(match[1]);
+                     if (parsed.error?.message) return parsed.error.message;
+                }
+            } catch {}
+            return "An issue occurred while communicating with the AI. Please try again.";
+        }
+        
+        return raw;
+    };
 
     const processProblem = async (problemText: string) => {
         setProblem(problemText);
@@ -53,7 +77,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
             setStep('done');
         } catch (err: any) {
             console.error("Processing Error:", err);
-            setError(err.message || 'An unknown error occurred while solving.');
+            setError(formatErrorMessage(err));
             setStep('error');
         }
     }
@@ -111,7 +135,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                 throw new Error("Could not find any math or physics problem in the image.");
             }
         } catch (e: any) {
-            setError(e.message || "An unknown error occurred while processing the image.");
+            setError(formatErrorMessage(e));
             setStep('error');
         }
     }, [resetState]);
