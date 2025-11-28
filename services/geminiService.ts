@@ -9,10 +9,40 @@ if (!process.env.API_KEY) {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
+ * Parses raw error objects from Gemini which might be JSON strings
+ * and returns a clean, user-friendly Error object.
+ */
+function formatGenAIError(error: any): Error {
+    let msg = error.message || String(error);
+    
+    // Check if the message itself is a JSON string (common with 429/400 errors)
+    try {
+        if (msg.includes('{') && msg.includes('}')) {
+             // Extract JSON part if mixed with text
+             const match = msg.match(/(\{.*\})/);
+             if (match) {
+                 const parsed = JSON.parse(match[1]);
+                 if (parsed.error && parsed.error.message) {
+                     msg = parsed.error.message;
+                 } else if (parsed.message) {
+                     msg = parsed.message;
+                 }
+             }
+        }
+    } catch (e) {
+        // Failed to parse, use original message
+    }
+
+    if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+        return new Error("Service is currently busy (Quota Exceeded). Trying fallback model...");
+    }
+
+    return new Error(msg);
+}
+
+/**
  * Safely parses a JSON string from a Gemini response,
  * stripping potential markdown code fences.
- * @param responseText The raw text from the Gemini response.
- * @returns The parsed JSON object.
  */
 function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     if (!responseText) {
@@ -43,7 +73,6 @@ function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     }
 }
 
-
 const fileToGenerativePart = (base64Data: string, mimeType: string) => {
   return {
     inlineData: {
@@ -52,6 +81,37 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
     },
   };
 };
+
+/**
+ * Helper function to retry an async operation with exponential backoff.
+ */
+async function withRetry<T>(
+    operation: () => Promise<T>,
+    retries: number = 2,
+    baseDelay: number = 1500
+): Promise<T> {
+    let lastError: any;
+    
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            lastError = error;
+            // Only retry on rate limits or server errors
+            const msg = (error.message || JSON.stringify(error)).toLowerCase();
+            const isTransient = msg.includes('429') || msg.includes('quota') || msg.includes('503') || msg.includes('overloaded');
+            
+            if (isTransient && i < retries - 1) {
+                const delay = baseDelay * Math.pow(2, i);
+                console.warn(`Transient error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw lastError;
+}
 
 export async function extractMathFromImage(imageDataUrl: string): Promise<string> {
     const [header, data] = imageDataUrl.split(',');
@@ -64,16 +124,24 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const imagePart = fileToGenerativePart(data, mimeType);
     const prompt = "Extract the mathematical or physics problem from this image. Return only the extracted text, without any additional explanation or formatting.";
 
+    // Try Gemini 3 Pro first for best vision recognition, fallback to Flash
     try {
-        // Use Flash for image extraction (multimodal) - it is fast and accurate
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [imagePart, { text: prompt }] },
         });
         return response.text?.trim() || "";
     } catch (error: any) {
-        console.error("Error extracting problem from image:", error);
-        throw new Error(error.message || "Failed to analyze the image.");
+        console.warn("Pro extraction failed, falling back to Flash:", error);
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [imagePart, { text: prompt }] },
+            });
+            return response.text?.trim() || "";
+        } catch (fallbackError) {
+             throw formatGenAIError(fallbackError);
+        }
     }
 }
 
@@ -116,23 +184,36 @@ When dealing with trigonometric functions like sin, cos, tan, be very clear abou
 
 export async function solveProblem(problem: string): Promise<Solution> {
     const prompt = getSolvePrompt(problem);
-    try {
-        // Prioritize gemini-2.5-flash for reliability and speed
+    
+    // Priority list: Pro 3 (Best) -> Flash 2.5 (Fast/Reliable) -> Lite (Backup)
+    const models = ['gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-flash-lite-latest'];
+    let lastError: any;
+
+    const attemptSolve = async (model: string) => {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: model,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: solutionSchema,
             },
         });
-        
         return parseGeminiJsonResponse<Solution>(response.text);
-    } catch (e: any) {
-        console.error("Error solving problem:", e);
-        // Propagate the actual error message to the UI so the user knows if it's Quota or Network
-        throw new Error(e.message || "The AI failed to solve the problem.");
+    };
+
+    for (const model of models) {
+        try {
+            // Try model with 1 retry for transient network issues
+            return await withRetry(() => attemptSolve(model), 1, 2000);
+        } catch (e: any) {
+            console.warn(`Model ${model} failed, trying next...`, e);
+            lastError = e;
+            // Continue to next model in loop
+        }
     }
+
+    // If all models fail, throw a formatted error
+    throw formatGenAIError(lastError);
 }
 
 
@@ -197,17 +278,20 @@ export async function getCurrencyExchangeRate(amount: number, from: string, to: 
     const prompt = `Based on the latest available data, what is the exchange rate to convert ${amount} ${from} to ${to}? Provide the converted amount, the exchange rate, and a brief disclaimer.`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: schema,
-            },
+        // Use Flash for currency as it's faster and data is sufficient
+        return await withRetry(async () => {
+             const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema,
+                },
+            });
+            return parseGeminiJsonResponse<{ convertedAmount: number, exchangeRate: number, disclaimer:string }>(response.text);
         });
-        return parseGeminiJsonResponse<{ convertedAmount: number, exchangeRate: number, disclaimer:string }>(response.text);
     } catch (error: any) {
         console.error("Error fetching currency exchange rate:", error);
-        throw new Error(error.message || "Failed to get currency conversion from AI.");
+        throw formatGenAIError(error);
     }
 }
