@@ -34,43 +34,51 @@ function formatGenAIError(error: any): Error {
     }
 
     if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-        return new Error("Service is currently busy (Quota Exceeded). Trying fallback model...");
+        return new Error("Service is currently busy (Quota Exceeded). Switched to backup model.");
     }
 
     return new Error(msg);
 }
 
 /**
- * Safely parses a JSON string from a Gemini response,
- * stripping potential markdown code fences.
+ * Safely parses a JSON string from a Gemini response.
+ * Uses multiple strategies to extract valid JSON from potential markdown or chatter.
  */
 function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     if (!responseText) {
         throw new Error("AI returned an empty response.");
     }
-    let jsonString = responseText.trim();
-    
-    // Find and extract the JSON block if it's wrapped in markdown
-    const jsonBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonBlockMatch && jsonBlockMatch[1]) {
-        jsonString = jsonBlockMatch[1];
-    }
-    // Also handle cases where it might just be wrapped in ``` without json tag
-    const blockMatch = jsonString.match(/```\s*([\s\S]*?)\s*```/);
-    if (!jsonBlockMatch && blockMatch && blockMatch[1]) {
-        jsonString = blockMatch[1];
+
+    // Strategy 1: Attempt direct parse
+    try {
+        return JSON.parse(responseText);
+    } catch (e) {
+        // Continue to next strategy
     }
 
-    if (!jsonString) {
-        throw new Error("AI returned an empty response.");
-    }
-    
+    // Strategy 2: Clean markdown code fences
+    let cleanText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     try {
-        return JSON.parse(jsonString);
+        return JSON.parse(cleanText);
     } catch (e) {
-        console.error("Failed to parse JSON response:", jsonString, e);
-        throw new Error("AI returned an invalid response format.");
+        // Continue
     }
+
+    // Strategy 3: Find the first '{' and last '}' to isolate the JSON object
+    const start = responseText.indexOf('{');
+    const end = responseText.lastIndexOf('}');
+    
+    if (start !== -1 && end !== -1 && end > start) {
+        const jsonSubstring = responseText.substring(start, end + 1);
+        try {
+            return JSON.parse(jsonSubstring);
+        } catch (e) {
+            console.error("Strategy 3 Parsing Failed:", jsonSubstring);
+        }
+    }
+
+    console.error("All JSON parsing strategies failed. Raw text:", responseText);
+    throw new Error("The AI provided a solution, but it was not in the expected format.");
 }
 
 const fileToGenerativePart = (base64Data: string, mimeType: string) => {
@@ -88,7 +96,7 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
 async function withRetry<T>(
     operation: () => Promise<T>,
     retries: number = 2,
-    baseDelay: number = 1500
+    baseDelay: number = 1000
 ): Promise<T> {
     let lastError: any;
     
@@ -97,13 +105,13 @@ async function withRetry<T>(
             return await operation();
         } catch (error: any) {
             lastError = error;
-            // Only retry on rate limits or server errors
+            // Only retry on rate limits (429) or server errors (5xx)
             const msg = (error.message || JSON.stringify(error)).toLowerCase();
             const isTransient = msg.includes('429') || msg.includes('quota') || msg.includes('503') || msg.includes('overloaded');
             
             if (isTransient && i < retries - 1) {
                 const delay = baseDelay * Math.pow(2, i);
-                console.warn(`Transient error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+                // console.warn(`Transient error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
@@ -175,9 +183,9 @@ const solutionSchema = {
     required: ["answer", "steps"]
 };
 
-const getSolvePrompt = (problem: string) => `Solve the following problem. As an AI tutor, your tone should be encouraging and helpful. Your response MUST be a single JSON object that conforms to the provided schema. Do not include any other text, explanations, or formatting outside of the JSON object. For each explanatory step in the 'steps' array, provide the corresponding mathematical calculation or equation in the 'calculationSteps' array. For example, if a step is "Subtract 5 from both sides", the calculation step could be "2x + 5 - 5 = 15 - 5".
+const getSolvePrompt = (problem: string) => `Solve the following problem. As an AI tutor, your tone should be encouraging and helpful. Your response MUST be a single JSON object that conforms to the provided schema. Do NOT include any markdown formatting, 'json' tags, or preamble. Just the raw JSON object.
 
-When dealing with trigonometric functions like sin, cos, tan, be very clear about whether you are using degrees or radians. If the input is ambiguous (e.g., "sin(1)"), assume degrees but explain the difference in one of the steps.
+For each explanatory step in the 'steps' array, provide the corresponding mathematical calculation or equation in the 'calculationSteps' array.
 
 **Problem to Solve:**
 "${problem}"`;
@@ -185,7 +193,9 @@ When dealing with trigonometric functions like sin, cos, tan, be very clear abou
 export async function solveProblem(problem: string): Promise<Solution> {
     const prompt = getSolvePrompt(problem);
     
-    // Priority list: Pro 3 (Best) -> Flash 2.5 (Fast/Reliable) -> Lite (Backup)
+    // 1. Try gemini-3-pro-preview (Best quality)
+    // 2. Try gemini-2.5-flash (Best speed/reliability fallback)
+    // 3. Try gemini-flash-lite-latest (Ultimate backup)
     const models = ['gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-flash-lite-latest'];
     let lastError: any;
 
@@ -203,16 +213,16 @@ export async function solveProblem(problem: string): Promise<Solution> {
 
     for (const model of models) {
         try {
-            // Try model with 1 retry for transient network issues
-            return await withRetry(() => attemptSolve(model), 1, 2000);
+            // We retry the model itself once if it fails, then move to the next model in the list
+            return await withRetry(() => attemptSolve(model), 2, 1000);
         } catch (e: any) {
-            console.warn(`Model ${model} failed, trying next...`, e);
+            console.warn(`Model ${model} failed. Trying next model...`, e);
             lastError = e;
-            // Continue to next model in loop
+            // Continue to the next model in the list
         }
     }
 
-    // If all models fail, throw a formatted error
+    // If all models failed, we throw a formatted error
     throw formatGenAIError(lastError);
 }
 
