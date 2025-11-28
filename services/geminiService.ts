@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { Solution } from '../types';
 
@@ -25,6 +24,11 @@ function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     const jsonBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch && jsonBlockMatch[1]) {
         jsonString = jsonBlockMatch[1];
+    }
+    // Also handle cases where it might just be wrapped in ``` without json tag
+    const blockMatch = jsonString.match(/```\s*([\s\S]*?)\s*```/);
+    if (!jsonBlockMatch && blockMatch && blockMatch[1]) {
+        jsonString = blockMatch[1];
     }
 
     if (!jsonString) {
@@ -61,25 +65,15 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const prompt = "Extract the mathematical or physics problem from this image. Return only the extracted text, without any additional explanation or formatting.";
 
     try {
-        // Attempt with Pro model first
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-pro-preview',
-                contents: { parts: [imagePart, { text: prompt }] },
-            });
-            return response.text?.trim() || "";
-        } catch (proError) {
-            console.warn("Pro model failed for image extraction, retrying with Flash...", proError);
-            // Fallback to Flash model
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: { parts: [imagePart, { text: prompt }] },
-            });
-            return response.text?.trim() || "";
-        }
-    } catch (error) {
+        // Use Flash for image extraction (multimodal) - it is fast and accurate
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [imagePart, { text: prompt }] },
+        });
+        return response.text?.trim() || "";
+    } catch (error: any) {
         console.error("Error extracting problem from image:", error);
-        throw new Error("Failed to analyze the image. Please try again.");
+        throw new Error(error.message || "Failed to analyze the image.");
     }
 }
 
@@ -115,7 +109,7 @@ const solutionSchema = {
 
 const getSolvePrompt = (problem: string) => `Solve the following problem. As an AI tutor, your tone should be encouraging and helpful. Your response MUST be a single JSON object that conforms to the provided schema. Do not include any other text, explanations, or formatting outside of the JSON object. For each explanatory step in the 'steps' array, provide the corresponding mathematical calculation or equation in the 'calculationSteps' array. For example, if a step is "Subtract 5 from both sides", the calculation step could be "2x + 5 - 5 = 15 - 5".
 
-When dealing with trigonometric functions like sin, cos, tan, be very clear about whether you are using degrees or radians. If the input is ambiguous (e.g., "sin(1)"), assume degrees but explain the difference in one of the steps, like: "It looks like you're asking for the sine of 1. Usually, this means 1 degree, which is approximately 0.017. If you meant 1 radian, the answer would be different."
+When dealing with trigonometric functions like sin, cos, tan, be very clear about whether you are using degrees or radians. If the input is ambiguous (e.g., "sin(1)"), assume degrees but explain the difference in one of the steps.
 
 **Problem to Solve:**
 "${problem}"`;
@@ -123,40 +117,21 @@ When dealing with trigonometric functions like sin, cos, tan, be very clear abou
 export async function solveProblem(problem: string): Promise<Solution> {
     const prompt = getSolvePrompt(problem);
     try {
-        let responseText: string | undefined;
-
-        // Attempt with Pro model first
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-pro-preview',
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: solutionSchema,
-                },
-            });
-            responseText = response.text;
-        } catch (proError) {
-            console.warn("Pro model failed for solving, retrying with Flash...", proError);
-            // Fallback to Flash model
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: solutionSchema,
-                },
-            });
-            responseText = response.text;
-        }
+        // Prioritize gemini-2.5-flash for reliability and speed
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: solutionSchema,
+            },
+        });
         
-        return parseGeminiJsonResponse<Solution>(responseText);
+        return parseGeminiJsonResponse<Solution>(response.text);
     } catch (e: any) {
         console.error("Error solving problem:", e);
-        if (e.message.includes("AI returned")) {
-            throw e; // Re-throw custom, user-friendly errors
-        }
-        throw new Error("The AI failed to solve the problem. Please check your internet connection or try again.");
+        // Propagate the actual error message to the UI so the user knows if it's Quota or Network
+        throw new Error(e.message || "The AI failed to solve the problem.");
     }
 }
 
@@ -184,7 +159,6 @@ export async function solveCalculusProblem(
     return solveProblem(problemStatement);
 }
 
-// Fix: The 'matrices' parameter should accept an array of matrices (number[][][]), not just a single one (number[][]).
 export async function solveMatrixProblem(
     operation: string,
     matrices: number[][][]
@@ -234,9 +208,6 @@ export async function getCurrencyExchangeRate(amount: number, from: string, to: 
         return parseGeminiJsonResponse<{ convertedAmount: number, exchangeRate: number, disclaimer:string }>(response.text);
     } catch (error: any) {
         console.error("Error fetching currency exchange rate:", error);
-        if (error.message.includes("AI returned")) {
-            throw error; // Re-throw custom, user-friendly errors
-        }
-        throw new Error("Failed to get currency conversion from AI. Please try again later.");
+        throw new Error(error.message || "Failed to get currency conversion from AI.");
     }
 }
