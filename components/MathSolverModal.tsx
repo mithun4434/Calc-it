@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Solution } from '../types';
@@ -53,6 +52,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
             setSolution(result);
             setStep('done');
         } catch (err: any) {
+            console.error("Processing Error:", err);
             setError(err.message || 'An unknown error occurred while solving.');
             setStep('error');
         }
@@ -202,7 +202,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                             {step === 'error' && error && !isLoading && (
                                 <div className="text-center p-4 bg-red-500/10 dark:bg-red-900/50 border border-red-500/50 rounded-3xl">
                                     <h3 className="font-bold text-lg mb-2 text-red-700 dark:text-red-300">An Error Occurred</h3>
-                                    <p className="opacity-90">{error}</p>
+                                    <p className="opacity-90 break-words">{error}</p>
                                 </div>
                             )}
 
