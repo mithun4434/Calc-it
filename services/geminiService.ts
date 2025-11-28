@@ -61,11 +61,22 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const prompt = "Extract the mathematical or physics problem from this image. Return only the extracted text, without any additional explanation or formatting.";
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: { parts: [imagePart, { text: prompt }] },
-        });
-        return response.text?.trim() || "";
+        // Attempt with Pro model first
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: { parts: [imagePart, { text: prompt }] },
+            });
+            return response.text?.trim() || "";
+        } catch (proError) {
+            console.warn("Pro model failed for image extraction, retrying with Flash...", proError);
+            // Fallback to Flash model
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [imagePart, { text: prompt }] },
+            });
+            return response.text?.trim() || "";
+        }
     } catch (error) {
         console.error("Error extracting problem from image:", error);
         throw new Error("Failed to analyze the image. Please try again.");
@@ -112,21 +123,40 @@ When dealing with trigonometric functions like sin, cos, tan, be very clear abou
 export async function solveProblem(problem: string): Promise<Solution> {
     const prompt = getSolvePrompt(problem);
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: solutionSchema,
-            },
-        });
-        return parseGeminiJsonResponse<Solution>(response.text);
+        let responseText: string | undefined;
+
+        // Attempt with Pro model first
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: solutionSchema,
+                },
+            });
+            responseText = response.text;
+        } catch (proError) {
+            console.warn("Pro model failed for solving, retrying with Flash...", proError);
+            // Fallback to Flash model
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: solutionSchema,
+                },
+            });
+            responseText = response.text;
+        }
+        
+        return parseGeminiJsonResponse<Solution>(responseText);
     } catch (e: any) {
         console.error("Error solving problem:", e);
         if (e.message.includes("AI returned")) {
             throw e; // Re-throw custom, user-friendly errors
         }
-        throw new Error("The AI failed to solve the problem. It might be too complex or malformed.");
+        throw new Error("The AI failed to solve the problem. Please check your internet connection or try again.");
     }
 }
 
