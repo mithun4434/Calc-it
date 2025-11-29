@@ -51,7 +51,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
         }
         
         if (raw.includes("Quota")) {
-            return "Server is busy. We tried multiple models but all were occupied. Please try again in 10 seconds.";
+            return "Server is currently busy with high traffic. Please wait 30 seconds before trying again.";
         }
         
         return raw;
