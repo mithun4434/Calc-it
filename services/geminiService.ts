@@ -2,23 +2,30 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { Solution } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+// Lazy initialization getter
+let aiClient: GoogleGenAI | null = null;
+
+function getAiClient(): GoogleGenAI {
+    if (aiClient) return aiClient;
+    
+    // We check for the key at runtime, not load time.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("API Key is missing. Please check your deployment settings (process.env.API_KEY).");
+    }
+    
+    aiClient = new GoogleGenAI({ apiKey });
+    return aiClient;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 /**
- * Parses raw error objects from Gemini which might be JSON strings
- * and returns a clean, user-friendly Error object.
+ * Parses raw error objects from Gemini
  */
 function formatGenAIError(error: any): Error {
     let msg = error.message || String(error);
     
-    // Check if the message itself is a JSON string (common with 429/400 errors)
     try {
         if (msg.includes('{') && msg.includes('}')) {
-             // Extract JSON part if mixed with text
              const match = msg.match(/(\{.*\})/);
              if (match) {
                  const parsed = JSON.parse(match[1]);
@@ -32,53 +39,43 @@ function formatGenAIError(error: any): Error {
     } catch (e) {
         // Failed to parse, use original message
     }
-
-    if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-        return new Error("Server is busy (Quota Exceeded). All backup models are currently occupied.");
-    }
+    
+    // User friendly messages
+    if (msg.includes("API Key")) return new Error("Server configuration error: API Key missing.");
+    if (msg.includes("429")) return new Error("Server is busy (High Traffic). Please try again in 5 seconds.");
+    if (msg.includes("403")) return new Error("Access denied. Check API Key restrictions.");
 
     return new Error(msg);
 }
 
 /**
- * Safely parses a JSON string from a Gemini response.
- * Uses multiple strategies to extract valid JSON from potential markdown or chatter.
+ * Aggressive JSON parser
  */
 function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     if (!responseText) {
         throw new Error("AI returned an empty response.");
     }
 
-    // Strategy 1: Attempt direct parse
+    // 1. Try direct parse
     try {
         return JSON.parse(responseText);
-    } catch (e) {
-        // Continue to next strategy
-    }
+    } catch (e) {}
 
-    // Strategy 2: Clean markdown code fences
-    let cleanText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    // 2. Try removing markdown code blocks
+    let cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     try {
         return JSON.parse(cleanText);
-    } catch (e) {
-        // Continue
-    }
+    } catch (e) {}
 
-    // Strategy 3: Find the first '{' and last '}' to isolate the JSON object
-    const start = responseText.indexOf('{');
-    const end = responseText.lastIndexOf('}');
-    
-    if (start !== -1 && end !== -1 && end > start) {
-        const jsonSubstring = responseText.substring(start, end + 1);
+    // 3. Regex extraction
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
         try {
-            return JSON.parse(jsonSubstring);
-        } catch (e) {
-            console.error("Strategy 3 Parsing Failed:", jsonSubstring);
-        }
+            return JSON.parse(jsonMatch[0]);
+        } catch (e) {}
     }
 
-    console.error("All JSON parsing strategies failed. Raw text:", responseText);
-    throw new Error("The AI provided a solution, but it was not in the expected format.");
+    throw new Error("Failed to parse JSON response");
 }
 
 const fileToGenerativePart = (base64Data: string, mimeType: string) => {
@@ -91,49 +88,10 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
 };
 
 /**
- * Helper function to retry an async operation.
- * FAILS FAST on 429 (Quota) errors so the caller can switch models immediately.
- */
-async function withRetry<T>(
-    operation: () => Promise<T>,
-    retries: number = 2,
-    baseDelay: number = 1000
-): Promise<T> {
-    let lastError: any;
-    
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await operation();
-        } catch (error: any) {
-            lastError = error;
-            const msg = (error.message || JSON.stringify(error)).toLowerCase();
-            
-            // CRITICAL CHANGE: If it's a quota error (429), DO NOT RETRY.
-            // Throw immediately so the outer loop can switch to the next model (Flash) instantly.
-            if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
-                throw error;
-            }
-
-            // For other transient errors (503, network), wait and retry.
-            const isTransient = msg.includes('503') || msg.includes('overloaded') || msg.includes('fetch');
-            
-            if (isTransient && i < retries - 1) {
-                const delay = baseDelay * Math.pow(2, i);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                continue;
-            }
-            throw error;
-        }
-    }
-    throw lastError;
-}
-
-/**
- * Tries to solve simple arithmetic problems locally to avoid API calls and errors.
+ * Tries to solve simple arithmetic locally
  */
 function solveArithmeticLocally(problem: string): Solution | null {
     const cleanExpr = problem.trim();
-    // Strict regex: numbers, operators, parens, spaces, caret
     const mathRegex = /^[0-9+\-*/().\s^]+$/;
 
     if (!mathRegex.test(cleanExpr)) {
@@ -150,10 +108,9 @@ function solveArithmeticLocally(problem: string): Solution | null {
         const resultStr = String(Number(result.toPrecision(15)));
 
         return {
-            answer: `The answer is ${resultStr}.`,
+            answer: `The answer is ${resultStr}`,
             steps: [
-                `Identify the arithmetic expression: ${cleanExpr}`,
-                "Perform the calculation using standard order of operations (PEMDAS/BODMAS)."
+                `Calculated: ${cleanExpr}`,
             ],
             calculationSteps: [
                 `${cleanExpr} = ${resultStr}`
@@ -166,34 +123,34 @@ function solveArithmeticLocally(problem: string): Solution | null {
 }
 
 export async function extractMathFromImage(imageDataUrl: string): Promise<string> {
+    const ai = getAiClient();
     const [header, data] = imageDataUrl.split(',');
     if (!header || !data) throw new Error('Invalid image data URL format.');
     
     const mimeTypeMatch = header.match(/:(.*?);/);
-    if (!mimeTypeMatch || !mimeTypeMatch[1]) throw new Error('Could not extract MIME type from image data URL.');
+    if (!mimeTypeMatch || !mimeTypeMatch[1]) throw new Error('Could not extract MIME type.');
     const mimeType = mimeTypeMatch[1];
     
     const imagePart = fileToGenerativePart(data, mimeType);
-    const prompt = "Extract the mathematical or physics problem from this image. Return only the extracted text, without any additional explanation or formatting.";
+    const prompt = "Extract the mathematical problem. Return ONLY the text.";
 
-    // Logic: Try Pro -> Fail -> Try Flash
     try {
-        // Don't retry Pro on 429, fail fast to Flash
+        // Try fast model first for vision
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, { text: prompt }] },
         });
         return response.text?.trim() || "";
-    } catch (error: any) {
-        console.warn("Pro extraction failed, switching to Flash:", error);
+    } catch (error) {
+        // Fallback to Pro
         try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+             const response = await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
                 contents: { parts: [imagePart, { text: prompt }] },
             });
             return response.text?.trim() || "";
-        } catch (fallbackError) {
-             throw formatGenAIError(fallbackError);
+        } catch(e) {
+            throw new Error("Could not read image. Please type the problem.");
         }
     }
 }
@@ -201,159 +158,122 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
 const solutionSchema = {
     type: Type.OBJECT,
     properties: {
-        answer: { type: Type.STRING, description: "The final answer to the problem, expressed in a complete sentence." },
-        steps: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "An array of strings, where each string is a step-by-step explanation for solving the problem."
-        },
-        calculationSteps: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "An array of strings, where each string is the mathematical expression, equation, or calculation corresponding to a step in the solution. This should be parallel to the 'steps' array."
-        },
-        matrixAnswer: {
-            type: Type.ARRAY,
-            description: "If the answer is a matrix, this is the 2D array representation. Optional.",
-            items: {
-                type: Type.ARRAY,
-                items: { type: Type.NUMBER }
-            }
-        },
-        scalarAnswer: {
-            type: Type.NUMBER,
-            description: "If the answer is a single number, this is the numerical value. Optional."
-        }
+        answer: { type: Type.STRING },
+        steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+        calculationSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+        matrixAnswer: { type: Type.ARRAY, items: { type: Type.ARRAY, items: { type: Type.NUMBER } } },
+        scalarAnswer: { type: Type.NUMBER }
     },
     required: ["answer", "steps"]
 };
 
-const getSolvePrompt = (problem: string) => `Solve the following problem. As an AI tutor, your tone should be encouraging and helpful. Your response MUST be a single JSON object that conforms to the provided schema. Do NOT include any markdown formatting, 'json' tags, or preamble. Just the raw JSON object.
-
-For each explanatory step in the 'steps' array, provide the corresponding mathematical calculation or equation in the 'calculationSteps' array.
-
-**Problem to Solve:**
-"${problem}"`;
-
+/**
+ * Main Solver Function
+ */
 export async function solveProblem(problem: string): Promise<Solution> {
-    // 0. Try to solve locally first (Instant, Robust, Free)
-    const localSolution = solveArithmeticLocally(problem);
-    if (localSolution) {
-        return localSolution;
-    }
+    // 0. Connect Lazy
+    const ai = getAiClient();
 
-    const prompt = getSolvePrompt(problem);
-    
-    // 1. Try gemini-3-pro-preview (Best quality)
-    // 2. Try gemini-2.5-flash (Best speed/reliability fallback)
-    // Removed Lite model as it often fails complex JSON schema generation
+    // 1. Local Solve
+    const local = solveArithmeticLocally(problem);
+    if (local) return local;
+
+    // 2. Structured Solve
+    // Priority: Pro (Precision/Reasoning) -> Flash (Speed/Fallback)
+    // We prioritize gemini-3-pro-preview for highest mathematical accuracy
     const models = ['gemini-3-pro-preview', 'gemini-2.5-flash'];
-    let lastError: any;
-
-    const attemptSolve = async (model: string) => {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: solutionSchema,
-            },
-        });
-        return parseGeminiJsonResponse<Solution>(response.text);
-    };
+    
+    const prompt = `Solve this math/physics problem: "${problem}". 
+    
+    STRICT INSTRUCTIONS FOR PRECISION:
+    1. Perform calculations with maximum precision.
+    2. If the result involves irrational numbers (like π, √2, e), keep them in exact form AND provide a high-precision decimal approximation if applicable.
+    3. Show step-by-step derivation clearly.
+    4. Return the result in JSON format with 'answer' and 'steps'.
+    5. The 'answer' field should be the final concise result.`;
 
     for (const model of models) {
         try {
-            // withRetry is now configured to throw immediately on 429
-            // so we proceed to the next model in the array instantly.
-            return await withRetry(() => attemptSolve(model), 1, 1000);
-        } catch (e: any) {
-            console.warn(`Model ${model} failed. Switching model...`, e);
-            lastError = e;
-            // Continue to the next model in the list
-        }
-    }
-
-    // If all models failed
-    throw formatGenAIError(lastError);
-}
-
-
-export async function solveCalculusProblem(
-    type: 'integration' | 'differentiation',
-    problemDetails: {
-        expression: string;
-        variable: string;
-        lowerBound?: string;
-        upperBound?: string;
-    }
-): Promise<Solution> {
-    let problemStatement = '';
-    if (type === 'integration') {
-        if (problemDetails.lowerBound && problemDetails.upperBound && problemDetails.lowerBound.trim() !== '' && problemDetails.upperBound.trim() !== '') {
-            problemStatement = `Calculate the definite integral of ${problemDetails.expression} with respect to ${problemDetails.variable} from ${problemDetails.lowerBound} to ${problemDetails.upperBound}.`;
-        } else {
-            problemStatement = `Calculate the indefinite integral of ${problemDetails.expression} with respect to ${problemDetails.variable}. Provide the constant of integration as '+ C'.`;
-        }
-    } else { // differentiation
-        problemStatement = `Differentiate the expression ${problemDetails.expression} with respect to ${problemDetails.variable}.`;
-    }
-
-    return solveProblem(problemStatement);
-}
-
-export async function solveMatrixProblem(
-    operation: string,
-    matrices: number[][][]
-): Promise<Solution> {
-    let problemStatement = `As an AI tutor, please calculate the ${operation} for the given matrix/matrices and provide a friendly, step-by-step explanation.\n\n`;
-
-    matrices.forEach((matrix, index) => {
-        const matrixName = String.fromCharCode(65 + index); // A, B, C...
-        problemStatement += `Matrix ${matrixName}:\n${JSON.stringify(matrix)}\n\n`;
-    });
-
-    return solveProblem(problemStatement);
-}
-
-
-export async function getCurrencyExchangeRate(amount: number, from: string, to: string): Promise<{ convertedAmount: number, exchangeRate: number, disclaimer:string }> {
-     const schema = {
-        type: Type.OBJECT,
-        properties: {
-            convertedAmount: {
-                type: Type.NUMBER,
-                description: 'The final converted amount.',
-            },
-            exchangeRate: {
-                type: Type.NUMBER,
-                description: 'The exchange rate used for the conversion (1 FROM = X TO).',
-            },
-            disclaimer: {
-                type: Type.STRING,
-                description: 'A brief disclaimer that rates are approximate and based on latest available data.',
-            },
-        },
-        required: ['convertedAmount', 'exchangeRate', 'disclaimer'],
-    };
-
-    const prompt = `Based on the latest available data, what is the exchange rate to convert ${amount} ${from} to ${to}? Provide the converted amount, the exchange rate, and a brief disclaimer.`;
-
-    try {
-        // Use Flash for currency as it's faster and data is sufficient
-        return await withRetry(async () => {
-             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+            const response = await ai.models.generateContent({
+                model: model,
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
-                    responseSchema: schema,
+                    responseSchema: solutionSchema,
                 },
             });
-            return parseGeminiJsonResponse<{ convertedAmount: number, exchangeRate: number, disclaimer:string }>(response.text);
+            return parseGeminiJsonResponse<Solution>(response.text);
+        } catch (e) {
+            console.warn(`Structured solve failed on ${model}. Trying next.`);
+            continue; 
+        }
+    }
+
+    // 3. TEXT FALLBACK (The "Just give me anything" Option)
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Solve this problem step-by-step with high precision: ${problem}`,
         });
-    } catch (error: any) {
-        console.error("Error fetching currency exchange rate:", error);
-        throw formatGenAIError(error);
+        
+        let rawText = "";
+        
+        // Robust text extraction
+        if (response.text) {
+            rawText = response.text;
+        } else if (response.candidates && response.candidates.length > 0) {
+            const candidate = response.candidates[0];
+             // Check if blocked by safety
+            if (candidate.finishReason === 'SAFETY') {
+                 throw new Error("I cannot solve this problem because it triggers safety filters.");
+            }
+            if (candidate.finishReason === 'RECITATION') {
+                 throw new Error("I cannot solve this problem due to copyright/recitation limits.");
+            }
+             // Try to dig out parts
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                rawText = candidate.content.parts.map(p => p.text).join('\n');
+            }
+        }
+
+        if (!rawText) {
+             throw new Error("No response content generated.");
+        }
+        
+        return {
+            answer: "Here is the solution:",
+            steps: rawText.split('\n').filter(line => line.trim().length > 0),
+            calculationSteps: []
+        };
+    } catch (finalError: any) {
+        // Throw a formatted error that the UI can display nicely
+        throw formatGenAIError(finalError);
+    }
+}
+
+export async function solveCalculusProblem(type: string, details: any): Promise<Solution> {
+    const d = details;
+    const problem = type === 'integration' 
+        ? `Integrate ${d.expression} variable ${d.variable} ${d.lowerBound ? `from ${d.lowerBound} to ${d.upperBound}` : ''}`
+        : `Differentiate ${d.expression} variable ${d.variable}`;
+    return solveProblem(problem);
+}
+
+export async function solveMatrixProblem(op: string, matrices: number[][][]): Promise<Solution> {
+    const mStr = matrices.map(m => JSON.stringify(m)).join(', ');
+    return solveProblem(`Matrix ${op}: ${mStr}`);
+}
+
+export async function getCurrencyExchangeRate(amount: number, from: string, to: string): Promise<any> {
+    const ai = getAiClient();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Convert ${amount} ${from} to ${to}. Return JSON: { "convertedAmount": number, "exchangeRate": number, "disclaimer": string }`,
+            config: { responseMimeType: "application/json" }
+        });
+        return parseGeminiJsonResponse(response.text);
+    } catch (e) {
+        throw formatGenAIError(e);
     }
 }

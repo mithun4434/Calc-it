@@ -40,22 +40,6 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
         setError(null);
         setStep('idle');
     }, []);
-    
-    // Clean up error messages for display
-    const formatErrorMessage = (err: any): string => {
-        const raw = err?.message || String(err);
-        
-        // Remove JSON garbage if it slipped through
-        if (raw.includes('{"') || raw.includes('"{')) {
-            return "Unable to retrieve a solution at this time. Please try again momentarily.";
-        }
-        
-        if (raw.includes("Quota")) {
-            return "Server is currently busy with high traffic. Please wait 30 seconds before trying again.";
-        }
-        
-        return raw;
-    };
 
     const processProblem = async (problemText: string) => {
         setProblem(problemText);
@@ -68,8 +52,8 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
             setSolution(result);
             setStep('done');
         } catch (err: any) {
-            console.error("Processing Error:", err);
-            setError(formatErrorMessage(err));
+            console.error("Solver Error:", err);
+            setError(err.message || "Unable to solve the problem at this time.");
             setStep('error');
         }
     }
@@ -108,8 +92,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                 await handleImageSubmit(photo.dataUrl);
             }
         } catch (error) {
-            console.error('Camera capture failed:', error);
-            setError("Could not capture image. Please ensure the app has camera permissions.");
+            setError("Could not capture image.");
             setStep('error');
         }
     };
@@ -124,10 +107,10 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
             if (extractedText) {
                 await processProblem(extractedText);
             } else {
-                throw new Error("Could not find any math or physics problem in the image.");
+                throw new Error("Could not detect any math problem in the image.");
             }
         } catch (e: any) {
-            setError(formatErrorMessage(e));
+            setError(e.message || "Error processing image.");
             setStep('error');
         }
     }, [resetState]);
@@ -167,7 +150,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                             <textarea
                                 value={text}
                                 onChange={(e) => setText(e.target.value)}
-                                placeholder="Paste or type a math or physics problem here...&#10;e.g., solve 2x + 5 = 15"
+                                placeholder="Type a problem here (e.g., 'Solve 2x + 5 = 15')..."
                                 className="w-full h-28 p-3 bg-black/10 dark:bg-black/20 border border-current/10 rounded-2xl focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-colors disabled:opacity-50"
                                 disabled={isLoading}
                             />
@@ -201,7 +184,6 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                          <div className="border-t border-current/10 pt-6">
                             {imageSrc && (
                                 <div className="mb-6">
-                                    <h3 className="text-sm font-semibold opacity-60 uppercase tracking-wider text-center">Your Image</h3>
                                     <div className="mt-2 border border-current/10 rounded-2xl p-2 max-w-xs mx-auto bg-black/5 dark:bg-black/20">
                                         <img src={imageSrc} alt="Math problem" className="max-h-40 w-auto mx-auto rounded-xl" />
                                     </div>
@@ -218,7 +200,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                             {step === 'error' && error && !isLoading && (
                                 <div className="text-center p-4 bg-red-500/10 dark:bg-red-900/50 border border-red-500/50 rounded-3xl">
                                     <h3 className="font-bold text-lg mb-2 text-red-700 dark:text-red-300">Issue Encountered</h3>
-                                    <p className="opacity-90 break-words">{error}</p>
+                                    <p className="opacity-90 break-words text-sm sm:text-base">{error}</p>
                                 </div>
                             )}
 
@@ -235,7 +217,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                                     <div className="border-t border-current/10 pt-6">
                                         <h3 className="text-sm font-semibold opacity-60 uppercase tracking-wider">Answer</h3>
                                         <div className="mt-2 text-left bg-gray-500/10 dark:bg-gray-500/20 border border-gray-500/30 p-4 rounded-3xl">
-                                            <p className="text-2xl font-bold break-words">{solution.answer}</p>
+                                            <p className="text-2xl font-bold break-words whitespace-pre-wrap">{solution.answer}</p>
                                             {solution.matrixAnswer && <MatrixDisplay matrix={solution.matrixAnswer} />}
                                         </div>
                                     </div>
@@ -243,7 +225,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                                     
                                     {solution.steps && solution.steps.length > 0 && (
                                     <div className="border-t border-current/10 pt-6">
-                                        <h3 className="text-sm font-semibold opacity-60 uppercase tracking-wider">Step-by-Step Solution</h3>
+                                        <h3 className="text-sm font-semibold opacity-60 uppercase tracking-wider">Solution</h3>
                                         <ul className="mt-3 space-y-3">
                                             {solution.steps.map((step, index) => (
                                                 <li key={index} className="p-3 bg-black/5 dark:bg-black/20 rounded-2xl">
@@ -251,7 +233,7 @@ const MathSolverModal: React.FC<MathSolverModalProps> = ({ isOpen, onClose }) =>
                                                         <div className="flex-shrink-0 h-6 w-6 bg-gray-500/20 border border-gray-500/30 text-current font-bold text-xs rounded-full flex items-center justify-center mt-1">
                                                             {index + 1}
                                                         </div>
-                                                        <p className="flex-1 opacity-90 leading-relaxed">{step}</p>
+                                                        <p className="flex-1 opacity-90 leading-relaxed whitespace-pre-wrap">{step}</p>
                                                     </div>
                                                     {solution.calculationSteps?.[index] && (
                                                         <div className="mt-2 pl-9">
