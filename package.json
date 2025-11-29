@@ -1,22 +1,20 @@
 {
-  "name": "ai-smart-calculator",
+  "name": "calc-it",
   "version": "1.0.0",
-  "description": "An intelligent calculator that solves math problems.",
+  "private": true,
   "scripts": {
-    "sync": "npx cap sync",
-    "open": "npx cap open android"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.26.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@capacitor/core": "^6.1.1",
-    "@capacitor/android": "^6.1.1",
-    "@capacitor/camera": "^6.0.1"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.1"
-  },
-  "author": "",
-  "license": "ISC"
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.0.0"
+  }
 }
+
