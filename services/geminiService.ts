@@ -34,7 +34,7 @@ function formatGenAIError(error: any): Error {
     }
 
     if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-        return new Error("Service is currently busy (Quota Exceeded). Switched to backup model.");
+        return new Error("Server is busy (Quota Exceeded). Switched to backup model.");
     }
 
     return new Error(msg);
@@ -95,8 +95,8 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
  */
 async function withRetry<T>(
     operation: () => Promise<T>,
-    retries: number = 2,
-    baseDelay: number = 1000
+    retries: number = 3,
+    baseDelay: number = 2000
 ): Promise<T> {
     let lastError: any;
     
@@ -119,6 +119,50 @@ async function withRetry<T>(
         }
     }
     throw lastError;
+}
+
+/**
+ * Tries to solve simple arithmetic problems locally to avoid API calls and errors.
+ */
+function solveArithmeticLocally(problem: string): Solution | null {
+    // 1. Clean the input
+    const cleanExpr = problem.trim();
+
+    // 2. Strict regex to ensure it's just math (security best practice)
+    // Allows numbers, whitespace, +, -, *, /, ^, (, ), .
+    const mathRegex = /^[0-9+\-*/().\s^]+$/;
+
+    if (!mathRegex.test(cleanExpr)) {
+        return null;
+    }
+
+    try {
+        // 3. Convert caret ^ to JS power **
+        const jsExpr = cleanExpr.replace(/\^/g, '**');
+
+        // 4. Evaluate safely using Function constructor
+        // eslint-disable-next-line no-new-func
+        const result = new Function(`"use strict"; return (${jsExpr})`)();
+
+        if (!isFinite(result) || isNaN(result)) return null;
+
+        const resultStr = String(Number(result.toPrecision(15))); // Handle floating point precision
+
+        return {
+            answer: `The answer is ${resultStr}.`,
+            steps: [
+                `Identify the arithmetic expression: ${cleanExpr}`,
+                "Perform the calculation using standard order of operations (PEMDAS/BODMAS)."
+            ],
+            calculationSteps: [
+                `${cleanExpr} = ${resultStr}`
+            ],
+            scalarAnswer: Number(resultStr)
+        };
+    } catch (e) {
+        // If local eval fails (e.g. syntax error), fall back to AI
+        return null;
+    }
 }
 
 export async function extractMathFromImage(imageDataUrl: string): Promise<string> {
@@ -191,6 +235,13 @@ For each explanatory step in the 'steps' array, provide the corresponding mathem
 "${problem}"`;
 
 export async function solveProblem(problem: string): Promise<Solution> {
+    // 0. Try to solve locally first (Instant, Robust, Free)
+    // This handles "2+2" and simple stuff without bothering the busy AI.
+    const localSolution = solveArithmeticLocally(problem);
+    if (localSolution) {
+        return localSolution;
+    }
+
     const prompt = getSolvePrompt(problem);
     
     // 1. Try gemini-3-pro-preview (Best quality)
@@ -213,8 +264,8 @@ export async function solveProblem(problem: string): Promise<Solution> {
 
     for (const model of models) {
         try {
-            // We retry the model itself once if it fails, then move to the next model in the list
-            return await withRetry(() => attemptSolve(model), 2, 1000);
+            // We retry the model itself multiple times with a longer delay if it fails
+            return await withRetry(() => attemptSolve(model), 3, 2000);
         } catch (e: any) {
             console.warn(`Model ${model} failed. Trying next model...`, e);
             lastError = e;
