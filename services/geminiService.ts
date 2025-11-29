@@ -34,7 +34,7 @@ function formatGenAIError(error: any): Error {
     }
 
     if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-        return new Error("Server is busy (Quota Exceeded). Switched to backup model.");
+        return new Error("Server is busy (Quota Exceeded). All backup models are currently occupied.");
     }
 
     return new Error(msg);
@@ -91,12 +91,13 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
 };
 
 /**
- * Helper function to retry an async operation with exponential backoff.
+ * Helper function to retry an async operation.
+ * FAILS FAST on 429 (Quota) errors so the caller can switch models immediately.
  */
 async function withRetry<T>(
     operation: () => Promise<T>,
-    retries: number = 3,
-    baseDelay: number = 2000
+    retries: number = 2,
+    baseDelay: number = 1000
 ): Promise<T> {
     let lastError: any;
     
@@ -105,13 +106,19 @@ async function withRetry<T>(
             return await operation();
         } catch (error: any) {
             lastError = error;
-            // Only retry on rate limits (429) or server errors (5xx)
             const msg = (error.message || JSON.stringify(error)).toLowerCase();
-            const isTransient = msg.includes('429') || msg.includes('quota') || msg.includes('503') || msg.includes('overloaded');
+            
+            // CRITICAL CHANGE: If it's a quota error (429), DO NOT RETRY.
+            // Throw immediately so the outer loop can switch to the next model (Flash) instantly.
+            if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
+                throw error;
+            }
+
+            // For other transient errors (503, network), wait and retry.
+            const isTransient = msg.includes('503') || msg.includes('overloaded') || msg.includes('fetch');
             
             if (isTransient && i < retries - 1) {
                 const delay = baseDelay * Math.pow(2, i);
-                // console.warn(`Transient error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
@@ -125,11 +132,8 @@ async function withRetry<T>(
  * Tries to solve simple arithmetic problems locally to avoid API calls and errors.
  */
 function solveArithmeticLocally(problem: string): Solution | null {
-    // 1. Clean the input
     const cleanExpr = problem.trim();
-
-    // 2. Strict regex to ensure it's just math (security best practice)
-    // Allows numbers, whitespace, +, -, *, /, ^, (, ), .
+    // Strict regex: numbers, operators, parens, spaces, caret
     const mathRegex = /^[0-9+\-*/().\s^]+$/;
 
     if (!mathRegex.test(cleanExpr)) {
@@ -137,16 +141,13 @@ function solveArithmeticLocally(problem: string): Solution | null {
     }
 
     try {
-        // 3. Convert caret ^ to JS power **
         const jsExpr = cleanExpr.replace(/\^/g, '**');
-
-        // 4. Evaluate safely using Function constructor
         // eslint-disable-next-line no-new-func
         const result = new Function(`"use strict"; return (${jsExpr})`)();
 
         if (!isFinite(result) || isNaN(result)) return null;
 
-        const resultStr = String(Number(result.toPrecision(15))); // Handle floating point precision
+        const resultStr = String(Number(result.toPrecision(15)));
 
         return {
             answer: `The answer is ${resultStr}.`,
@@ -160,7 +161,6 @@ function solveArithmeticLocally(problem: string): Solution | null {
             scalarAnswer: Number(resultStr)
         };
     } catch (e) {
-        // If local eval fails (e.g. syntax error), fall back to AI
         return null;
     }
 }
@@ -176,15 +176,16 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const imagePart = fileToGenerativePart(data, mimeType);
     const prompt = "Extract the mathematical or physics problem from this image. Return only the extracted text, without any additional explanation or formatting.";
 
-    // Try Gemini 3 Pro first for best vision recognition, fallback to Flash
+    // Logic: Try Pro -> Fail -> Try Flash
     try {
+        // Don't retry Pro on 429, fail fast to Flash
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
             contents: { parts: [imagePart, { text: prompt }] },
         });
         return response.text?.trim() || "";
     } catch (error: any) {
-        console.warn("Pro extraction failed, falling back to Flash:", error);
+        console.warn("Pro extraction failed, switching to Flash:", error);
         try {
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -236,7 +237,6 @@ For each explanatory step in the 'steps' array, provide the corresponding mathem
 
 export async function solveProblem(problem: string): Promise<Solution> {
     // 0. Try to solve locally first (Instant, Robust, Free)
-    // This handles "2+2" and simple stuff without bothering the busy AI.
     const localSolution = solveArithmeticLocally(problem);
     if (localSolution) {
         return localSolution;
@@ -246,8 +246,8 @@ export async function solveProblem(problem: string): Promise<Solution> {
     
     // 1. Try gemini-3-pro-preview (Best quality)
     // 2. Try gemini-2.5-flash (Best speed/reliability fallback)
-    // 3. Try gemini-flash-lite-latest (Ultimate backup)
-    const models = ['gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-flash-lite-latest'];
+    // Removed Lite model as it often fails complex JSON schema generation
+    const models = ['gemini-3-pro-preview', 'gemini-2.5-flash'];
     let lastError: any;
 
     const attemptSolve = async (model: string) => {
@@ -264,16 +264,17 @@ export async function solveProblem(problem: string): Promise<Solution> {
 
     for (const model of models) {
         try {
-            // We retry the model itself multiple times with a longer delay if it fails
-            return await withRetry(() => attemptSolve(model), 3, 2000);
+            // withRetry is now configured to throw immediately on 429
+            // so we proceed to the next model in the array instantly.
+            return await withRetry(() => attemptSolve(model), 1, 1000);
         } catch (e: any) {
-            console.warn(`Model ${model} failed. Trying next model...`, e);
+            console.warn(`Model ${model} failed. Switching model...`, e);
             lastError = e;
             // Continue to the next model in the list
         }
     }
 
-    // If all models failed, we throw a formatted error
+    // If all models failed
     throw formatGenAIError(lastError);
 }
 
