@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
-import { GoogleGenAI, Chat, Part } from "@google/genai";
+import { GoogleGenAI, Chat, Part, Content } from "@google/genai";
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import Spinner from '../Spinner';
 import InputWrapper from '../InputWrapper';
@@ -35,7 +36,11 @@ const MITChat: React.FC = () => {
     const [imageToSend, setImageToSend] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
+    // Track the current model being used
+    const [currentModel, setCurrentModel] = useState<'gemini-3-pro-preview' | 'gemini-2.5-flash'>('gemini-3-pro-preview');
 
+    // Initialize chat
     useEffect(() => {
         const initChat = () => {
             const chatSession = ai.chats.create({
@@ -84,68 +89,111 @@ const MITChat: React.FC = () => {
             }
         } catch (error) {
             console.error('Camera capture failed:', error);
-            // Optionally, display an error message to the user in the chat
         }
+    };
+
+    /**
+     * Converts our local Message state into the format required by the Google GenAI SDK history.
+     */
+    const getHistoryForFallback = (msgs: Message[]): Content[] => {
+        // Filter out the initial welcome message if it was purely local (it usually is)
+        // and filter out empty messages.
+        // We only take messages that have content.
+        return msgs
+            .filter((m, i) => i > 0 && m.text) // Skip index 0 (welcome)
+            .map(m => ({
+                role: m.role,
+                parts: [{ text: m.text }] // Simplified: omitting images from history for robust fallback
+            }));
     };
 
     const handleSendMessage = async (e: FormEvent) => {
         e.preventDefault();
         if ((!inputValue.trim() && !imageToSend) || !chat || isLoading) return;
 
-        const userMessage: Message = { role: 'user', text: inputValue, image: imageToSend || undefined };
-        const currentImage = imageToSend;
+        const userMessageText = inputValue.trim();
+        const userImage = imageToSend;
         
+        // Add user message to UI immediately
+        const userMessage: Message = { role: 'user', text: userMessageText, image: userImage || undefined };
         setMessages(prev => [...prev, userMessage, { role: 'model', text: '' }]);
+        
         setInputValue('');
         setImageToSend(null);
         setIsLoading(true);
 
-        try {
-            const parts: Part[] = [];
-            if (inputValue.trim()) {
-                parts.push({ text: inputValue.trim() });
-            }
-            if (currentImage) {
-                const [header, data] = currentImage.split(',');
-                if (!header || !data) throw new Error('Invalid image data URL format.');
-                
-                const mimeTypeMatch = header.match(/:(.*?);/);
-                if (!mimeTypeMatch || !mimeTypeMatch[1]) throw new Error('Could not extract MIME type from image data URL.');
-                
-                parts.push({ inlineData: { data, mimeType: mimeTypeMatch[1] } });
-            }
-
-            const stream = await chat.sendMessageStream({ message: parts });
-            let modelResponse = '';
-
-            for await (const chunk of stream) {
-                if (chunk.text) {
-                    modelResponse += chunk.text;
-                    setMessages(prev => {
-                        const newMessages = [...prev];
-                        const lastMessage = newMessages[newMessages.length - 1];
-                        if (lastMessage) {
-                            lastMessage.text = modelResponse;
-                        }
-                        return newMessages;
-                    });
-                }
-            }
-        } catch (error) {
-            console.error("Error sending message:", error);
-            setMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage && lastMessage.role === 'model') {
-                    lastMessage.text = "Oops! Something went wrong. Please try asking again.";
-                } else {
-                    newMessages.push({ role: 'model', text: "Oops! Something went wrong. Please try asking again." });
-                }
-                return newMessages;
-            });
-        } finally {
-            setIsLoading(false);
+        const parts: Part[] = [];
+        if (userMessageText) {
+            parts.push({ text: userMessageText });
         }
+        if (userImage) {
+            try {
+                const [header, data] = userImage.split(',');
+                const mimeTypeMatch = header.match(/:(.*?);/);
+                if (mimeTypeMatch && mimeTypeMatch[1]) {
+                    parts.push({ inlineData: { data, mimeType: mimeTypeMatch[1] } });
+                }
+            } catch (err) {
+                console.error("Error parsing image for send", err);
+            }
+        }
+
+        const executeSendMessage = async (activeChat: Chat, isRetry = false): Promise<void> => {
+            try {
+                const stream = await activeChat.sendMessageStream({ message: parts });
+                let modelResponse = '';
+
+                for await (const chunk of stream) {
+                    if (chunk.text) {
+                        modelResponse += chunk.text;
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            const lastMessage = newMessages[newMessages.length - 1];
+                            if (lastMessage) {
+                                lastMessage.text = modelResponse;
+                            }
+                            return newMessages;
+                        });
+                    }
+                }
+            } catch (error: any) {
+                console.warn(`Chat Error (Model: ${currentModel}):`, error);
+                
+                // If this wasn't a retry and we are on the Pro model, try falling back to Flash
+                if (!isRetry && currentModel === 'gemini-3-pro-preview') {
+                    console.log("Attempting fallback to gemini-2.5-flash...");
+                    
+                    // Create new chat with history
+                    const history = getHistoryForFallback(messages); // Use messages before the current failed one
+                    const fallbackChat = ai.chats.create({
+                        model: 'gemini-2.5-flash',
+                        config: { systemInstruction: systemInstruction },
+                        history: history
+                    });
+                    
+                    setChat(fallbackChat);
+                    setCurrentModel('gemini-2.5-flash');
+                    
+                    // Retry sending the message with the new chat
+                    await executeSendMessage(fallbackChat, true);
+                    return;
+                }
+
+                // If fallback failed or we are already on fallback
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMessage = newMessages[newMessages.length - 1];
+                    const errorMessage = "I'm having trouble connecting right now. Please try asking again in a moment.";
+                    if (lastMessage && lastMessage.role === 'model') {
+                        lastMessage.text = errorMessage;
+                    }
+                    return newMessages;
+                });
+            }
+        };
+
+        await executeSendMessage(chat);
+        setIsLoading(false);
     };
 
     const iconicButtonClasses = "p-3 bg-black/10 dark:bg-black/20 border border-current/10 rounded-2xl transition-colors disabled:opacity-50 hover:bg-black/20 dark:hover:bg-white/20";
@@ -165,7 +213,12 @@ const MITChat: React.FC = () => {
                             {msg.image && (
                                 <img src={msg.image} alt="User upload" className="rounded-lg mb-2 max-w-full h-auto" />
                             )}
-                            {msg.text === '' && msg.role === 'model' && isLoading && <Spinner />}
+                            {msg.text === '' && msg.role === 'model' && isLoading && (
+                                <div className="flex items-center gap-2 text-sm opacity-70">
+                                    <Spinner />
+                                    <span>Thinking...</span>
+                                </div>
+                            )}
                             {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
                         </div>
                     </div>
