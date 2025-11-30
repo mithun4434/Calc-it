@@ -1,10 +1,10 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from '@capacitor/core';
 
 const config: CapacitorConfig = {
-  appId: 'com.aiccalculator.app',
+  appId: 'com.ai.smartcalculator',
   appName: 'AI Smart Calculator',
-  webDir: '.',
-  bundledWebRuntime: false,
+  webDir: 'dist',
+  bundledWebRuntime: false
 };
 
 export default config;
