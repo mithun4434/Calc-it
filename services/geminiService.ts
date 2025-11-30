@@ -8,10 +8,14 @@ let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI {
     if (aiClient) return aiClient;
     
-    // We check for the key at runtime, not load time.
-    const apiKey = process.env.API_KEY;
+    // Check multiple sources for the API Key
+    // 1. process.env.API_KEY (Injected via Vite define)
+    // 2. import.meta.env.VITE_API_KEY (Standard Vite usage)
+    const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
+
     if (!apiKey) {
-        throw new Error("API Key is missing. If you are in production, ensure `API_KEY` is set in your environment variables.");
+        console.error("API Key lookup failed. Checked process.env.API_KEY and import.meta.env.VITE_API_KEY.");
+        throw new Error("API Key is missing. Please ensure `API_KEY` is set in your environment variables or .env file.");
     }
     
     aiClient = new GoogleGenAI({ apiKey });
