@@ -8,12 +8,6 @@ import UploadIcon from '../icons/UploadIcon';
 import CameraIcon from '../icons/CameraIcon';
 import ClearIcon from '../icons/ClearIcon';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const systemInstruction = `You are MIT (Math & Inquiry Tutor), a friendly and encouraging AI assistant specializing in math and physics. Your goal is to help students understand concepts, not just give them answers.
 - Explain things clearly using simple analogies.
 - Ask follow-up questions to check for understanding.
@@ -35,25 +29,46 @@ const MITChat: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [imageToSend, setImageToSend] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const aiRef = useRef<GoogleGenAI | null>(null);
     
     // Track the current model being used
     const [currentModel, setCurrentModel] = useState<'gemini-3-pro-preview' | 'gemini-2.5-flash'>('gemini-3-pro-preview');
 
-    // Initialize chat
+    // Initialize AI and Chat
     useEffect(() => {
         const initChat = () => {
-            const chatSession = ai.chats.create({
-                model: 'gemini-3-pro-preview',
-                config: {
-                    systemInstruction: systemInstruction,
-                },
-            });
-            setChat(chatSession);
-            setMessages([{
-                role: 'model',
-                text: "Hello! I'm MIT. Feel free to ask me any math or physics question, or upload an image of a problem, and I'll do my best to help you understand it. What's on your mind today?"
-            }]);
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) {
+                setError("API Key is missing. Please check your deployment settings.");
+                setMessages([{
+                    role: 'model',
+                    text: "I cannot connect because the API Key is missing from the environment settings."
+                }]);
+                return;
+            }
+
+            try {
+                aiRef.current = new GoogleGenAI({ apiKey });
+                const chatSession = aiRef.current.chats.create({
+                    model: 'gemini-3-pro-preview',
+                    config: {
+                        systemInstruction: systemInstruction,
+                    },
+                });
+                setChat(chatSession);
+                setMessages([{
+                    role: 'model',
+                    text: "Hello! I'm MIT. Feel free to ask me any math or physics question, or upload an image of a problem, and I'll do my best to help you understand it. What's on your mind today?"
+                }]);
+            } catch (e: any) {
+                setError(e.message);
+                setMessages([{
+                    role: 'model',
+                    text: "Error initializing chat. Please try refreshing the page."
+                }]);
+            }
         };
         initChat();
     }, []);
@@ -96,14 +111,11 @@ const MITChat: React.FC = () => {
      * Converts our local Message state into the format required by the Google GenAI SDK history.
      */
     const getHistoryForFallback = (msgs: Message[]): Content[] => {
-        // Filter out the initial welcome message if it was purely local (it usually is)
-        // and filter out empty messages.
-        // We only take messages that have content.
         return msgs
             .filter((m, i) => i > 0 && m.text) // Skip index 0 (welcome)
             .map(m => ({
                 role: m.role,
-                parts: [{ text: m.text }] // Simplified: omitting images from history for robust fallback
+                parts: [{ text: m.text }] 
             }));
     };
 
@@ -160,30 +172,34 @@ const MITChat: React.FC = () => {
                 console.warn(`Chat Error (Model: ${currentModel}):`, error);
                 
                 // If this wasn't a retry and we are on the Pro model, try falling back to Flash
-                if (!isRetry && currentModel === 'gemini-3-pro-preview') {
+                if (!isRetry && currentModel === 'gemini-3-pro-preview' && aiRef.current) {
                     console.log("Attempting fallback to gemini-2.5-flash...");
                     
-                    // Create new chat with history
-                    const history = getHistoryForFallback(messages); // Use messages before the current failed one
-                    const fallbackChat = ai.chats.create({
-                        model: 'gemini-2.5-flash',
-                        config: { systemInstruction: systemInstruction },
-                        history: history
-                    });
-                    
-                    setChat(fallbackChat);
-                    setCurrentModel('gemini-2.5-flash');
-                    
-                    // Retry sending the message with the new chat
-                    await executeSendMessage(fallbackChat, true);
-                    return;
+                    try {
+                        // Create new chat with history
+                        const history = getHistoryForFallback(messages); 
+                        const fallbackChat = aiRef.current.chats.create({
+                            model: 'gemini-2.5-flash',
+                            config: { systemInstruction: systemInstruction },
+                            history: history
+                        });
+                        
+                        setChat(fallbackChat);
+                        setCurrentModel('gemini-2.5-flash');
+                        
+                        // Retry sending the message with the new chat
+                        await executeSendMessage(fallbackChat, true);
+                        return;
+                    } catch (fallbackError) {
+                        console.error("Fallback initialization failed:", fallbackError);
+                    }
                 }
 
                 // If fallback failed or we are already on fallback
                 setMessages(prev => {
                     const newMessages = [...prev];
                     const lastMessage = newMessages[newMessages.length - 1];
-                    const errorMessage = "I'm having trouble connecting right now. Please try asking again in a moment.";
+                    const errorMessage = "I'm having trouble connecting to the server. This might be due to high traffic or deployment settings.";
                     if (lastMessage && lastMessage.role === 'model') {
                         lastMessage.text = errorMessage;
                     }
@@ -197,6 +213,15 @@ const MITChat: React.FC = () => {
     };
 
     const iconicButtonClasses = "p-3 bg-black/10 dark:bg-black/20 border border-current/10 rounded-2xl transition-colors disabled:opacity-50 hover:bg-black/20 dark:hover:bg-white/20";
+
+    if (error) {
+        return (
+            <div className="glass-panel w-full max-w-lg mx-auto p-6 rounded-3xl flex flex-col items-center justify-center text-center">
+                <h2 className="text-xl font-bold text-red-500 mb-2">Configuration Error</h2>
+                <p className="opacity-80">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="glass-panel w-full max-w-lg mx-auto p-3 sm:p-4 rounded-3xl flex flex-col h-full">

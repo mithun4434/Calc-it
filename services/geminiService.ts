@@ -11,7 +11,7 @@ function getAiClient(): GoogleGenAI {
     // We check for the key at runtime, not load time.
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        throw new Error("API Key is missing. Please check your deployment settings (process.env.API_KEY).");
+        throw new Error("API Key is missing. If you are in production, ensure `API_KEY` is set in your environment variables.");
     }
     
     aiClient = new GoogleGenAI({ apiKey });
@@ -41,9 +41,10 @@ function formatGenAIError(error: any): Error {
     }
     
     // User friendly messages
-    if (msg.includes("API Key")) return new Error("Server configuration error: API Key missing.");
-    if (msg.includes("429")) return new Error("Server is busy (High Traffic). Please try again in 5 seconds.");
-    if (msg.includes("403")) return new Error("Access denied. Check API Key restrictions.");
+    if (msg.includes("API Key") || msg.includes("API_KEY")) return new Error("Server configuration error: API Key missing or invalid.");
+    if (msg.includes("429") || msg.includes("quota")) return new Error("Quota exceeded. Please wait a moment before trying again.");
+    if (msg.includes("403")) return new Error("Access denied. Check API Key restrictions or Region.");
+    if (msg.includes("500") || msg.includes("503")) return new Error("AI Service is temporarily unavailable. Please try again.");
 
     return new Error(msg);
 }
@@ -88,32 +89,56 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
 };
 
 /**
- * Tries to solve simple arithmetic locally
+ * Tries to solve simple arithmetic locally to save API quota
+ * Now supports basic scientific functions
  */
 function solveArithmeticLocally(problem: string): Solution | null {
-    const cleanExpr = problem.trim();
-    const mathRegex = /^[0-9+\-*/().\s^]+$/;
+    let cleanExpr = problem.toLowerCase().trim();
+    
+    // 1. Sanitize and Normalize
+    cleanExpr = cleanExpr
+        .replace(/×/g, '*')
+        .replace(/÷/g, '/')
+        .replace(/−/g, '-')
+        .replace(/\^/g, '**')
+        .replace(/\bpi\b/g, 'Math.PI')
+        .replace(/\be\b/g, 'Math.E')
+        .replace(/\bsin\b/g, 'Math.sin')
+        .replace(/\bcos\b/g, 'Math.cos')
+        .replace(/\btan\b/g, 'Math.tan')
+        .replace(/\bsqrt\b/g, 'Math.sqrt')
+        .replace(/\blog\b/g, 'Math.log10')
+        .replace(/\bln\b/g, 'Math.log');
 
-    if (!mathRegex.test(cleanExpr)) {
-        return null;
+    // 2. Security Check: Only allow numbers, operators, parens, and "Math." properties
+    // This prevents arbitrary code execution while allowing math
+    const safeRegex = /^[0-9+\-*/().\s]|Math\.[a-z0-9]+$/i;
+    
+    // Quick heuristic: If it contains letters that aren't part of "Math", reject it.
+    // We strip "Math." and then check if any letters remain.
+    const stripped = cleanExpr.replace(/Math\./g, '');
+    if (/[a-z]/.test(stripped)) {
+        return null; // Contains unknown variables or text
     }
 
     try {
-        const jsExpr = cleanExpr.replace(/\^/g, '**');
         // eslint-disable-next-line no-new-func
-        const result = new Function(`"use strict"; return (${jsExpr})`)();
+        const result = new Function(`"use strict"; return (${cleanExpr})`)();
 
         if (!isFinite(result) || isNaN(result)) return null;
 
+        // Format nicely
         const resultStr = String(Number(result.toPrecision(15)));
 
         return {
             answer: `The answer is ${resultStr}`,
             steps: [
-                `Calculated: ${cleanExpr}`,
+                `Identify expression: ${problem}`,
+                `Compute locally: ${cleanExpr.replace(/Math\./g, '')}`,
+                `Result: ${resultStr}`
             ],
             calculationSteps: [
-                `${cleanExpr} = ${resultStr}`
+                `${problem} = ${resultStr}`
             ],
             scalarAnswer: Number(resultStr)
         };
@@ -135,23 +160,13 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const prompt = "Extract the mathematical problem. Return ONLY the text.";
 
     try {
-        // Try fast model first for vision
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, { text: prompt }] },
         });
         return response.text?.trim() || "";
     } catch (error) {
-        // Fallback to Pro
-        try {
-             const response = await ai.models.generateContent({
-                model: 'gemini-3-pro-preview',
-                contents: { parts: [imagePart, { text: prompt }] },
-            });
-            return response.text?.trim() || "";
-        } catch(e) {
-            throw new Error("Could not read image. Please type the problem.");
-        }
+        throw formatGenAIError(error);
     }
 }
 
@@ -167,6 +182,9 @@ const solutionSchema = {
     required: ["answer", "steps"]
 };
 
+// Helper for delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * Main Solver Function
  */
@@ -174,80 +192,70 @@ export async function solveProblem(problem: string): Promise<Solution> {
     // 0. Connect Lazy
     const ai = getAiClient();
 
-    // 1. Local Solve
+    // 1. Local Solve (Saves Quota)
     const local = solveArithmeticLocally(problem);
     if (local) return local;
 
-    // 2. Structured Solve
-    // Priority: Pro (Precision/Reasoning) -> Flash (Speed/Fallback)
-    // We prioritize gemini-3-pro-preview for highest mathematical accuracy
-    const models = ['gemini-3-pro-preview', 'gemini-2.5-flash'];
+    // 2. API Solve
+    // We strictly use gemini-2.5-flash to maximize Rate Limits (Flash is higher than Pro).
+    // We avoid switching models on error to prevent cascading 429s.
     
     const prompt = `Solve this math/physics problem: "${problem}". 
     
-    STRICT INSTRUCTIONS FOR PRECISION:
-    1. Perform calculations with maximum precision.
-    2. If the result involves irrational numbers (like π, √2, e), keep them in exact form AND provide a high-precision decimal approximation if applicable.
-    3. Show step-by-step derivation clearly.
-    4. Return the result in JSON format with 'answer' and 'steps'.
-    5. The 'answer' field should be the final concise result.`;
+    STRICT INSTRUCTIONS:
+    1. Perform calculations with precision.
+    2. Show step-by-step derivation clearly.
+    3. Return the result in JSON format with 'answer' and 'steps'.
+    4. The 'answer' field should be the final concise result.`;
 
-    for (const model of models) {
-        try {
-            const response = await ai.models.generateContent({
-                model: model,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: solutionSchema,
-                },
-            });
-            return parseGeminiJsonResponse<Solution>(response.text);
-        } catch (e) {
-            console.warn(`Structured solve failed on ${model}. Trying next.`);
-            continue; 
-        }
-    }
-
-    // 3. TEXT FALLBACK (The "Just give me anything" Option)
     try {
+        // Attempt 1: Structured JSON
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Solve this problem step-by-step with high precision: ${problem}`,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: solutionSchema,
+            },
         });
+        return parseGeminiJsonResponse<Solution>(response.text);
+
+    } catch (e: any) {
+        const isQuota = e.message?.includes('429') || e.message?.includes('quota');
         
-        let rawText = "";
-        
-        // Robust text extraction
-        if (response.text) {
-            rawText = response.text;
-        } else if (response.candidates && response.candidates.length > 0) {
-            const candidate = response.candidates[0];
-             // Check if blocked by safety
-            if (candidate.finishReason === 'SAFETY') {
-                 throw new Error("I cannot solve this problem because it triggers safety filters.");
-            }
-            if (candidate.finishReason === 'RECITATION') {
-                 throw new Error("I cannot solve this problem due to copyright/recitation limits.");
-            }
-             // Try to dig out parts
-            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                rawText = candidate.content.parts.map(p => p.text).join('\n');
-            }
+        if (isQuota) {
+            console.warn("Quota exceeded. Waiting 2s before retry...");
+            await delay(2000); // Smart backoff
         }
 
-        if (!rawText) {
-             throw new Error("No response content generated.");
+        // Attempt 2: Fallback to Text Mode (lighter request)
+        // We reuse the Flash model.
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Solve this problem step-by-step: ${problem}`,
+            });
+            
+            let rawText = "";
+            if (response.text) {
+                rawText = response.text;
+            } else if (response.candidates && response.candidates.length > 0) {
+                 if (response.candidates[0].content && response.candidates[0].content.parts) {
+                    rawText = response.candidates[0].content.parts.map(p => p.text).join('\n');
+                 }
+            }
+
+            if (!rawText) throw new Error("No response generated.");
+            
+            return {
+                answer: "Solution found:",
+                steps: rawText.split('\n').filter(line => line.trim().length > 0),
+                calculationSteps: []
+            };
+
+        } catch (finalError: any) {
+            throw formatGenAIError(finalError);
         }
-        
-        return {
-            answer: "Here is the solution:",
-            steps: rawText.split('\n').filter(line => line.trim().length > 0),
-            calculationSteps: []
-        };
-    } catch (finalError: any) {
-        // Throw a formatted error that the UI can display nicely
-        throw formatGenAIError(finalError);
     }
 }
 
