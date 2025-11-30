@@ -2,19 +2,31 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { Solution } from '../types';
 
+// Declare global constant injected by Vite
+declare const __API_KEY__: string | undefined;
+
 // Lazy initialization getter
 let aiClient: GoogleGenAI | null = null;
 
 function getAiClient(): GoogleGenAI {
     if (aiClient) return aiClient;
     
-    // Check multiple sources for the API Key
-    // 1. process.env.API_KEY (Injected via Vite define)
-    // 2. import.meta.env.VITE_API_KEY (Standard Vite usage)
-    const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
+    // Robust Key Retrieval Strategy
+    // 1. __API_KEY__: Injected by Vite build process (Most reliable)
+    // 2. import.meta.env.VITE_API_KEY: Standard Vite usage
+    // 3. process.env.API_KEY: Legacy/Node env var
+    let apiKey = typeof __API_KEY__ !== 'undefined' ? __API_KEY__ : undefined;
+    
+    if (!apiKey && (import.meta as any).env) {
+        apiKey = (import.meta as any).env.VITE_API_KEY;
+    }
+    
+    if (!apiKey && typeof process !== 'undefined' && process.env) {
+        apiKey = process.env.API_KEY;
+    }
 
     if (!apiKey) {
-        console.error("API Key lookup failed. Checked process.env.API_KEY and import.meta.env.VITE_API_KEY.");
+        console.error("Critical Error: API Key is missing from all sources (__API_KEY__, import.meta.env, process.env).");
         throw new Error("API Key is missing. Please ensure `API_KEY` is set in your environment variables or .env file.");
     }
     
