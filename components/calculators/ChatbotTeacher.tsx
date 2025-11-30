@@ -7,6 +7,7 @@ import InputWrapper from '../InputWrapper';
 import UploadIcon from '../icons/UploadIcon';
 import CameraIcon from '../icons/CameraIcon';
 import ClearIcon from '../icons/ClearIcon';
+import { getSystemApiKey } from '../../services/geminiService';
 
 const systemInstruction = `You are MIT (Math & Inquiry Tutor), a friendly and encouraging AI assistant specializing in math and physics. Your goal is to help students understand concepts, not just give them answers.
 - Explain things clearly using simple analogies.
@@ -39,9 +40,9 @@ const MITChat: React.FC = () => {
     // Initialize AI and Chat
     useEffect(() => {
         const initChat = () => {
-            const apiKey = process.env.API_KEY;
+            const apiKey = getSystemApiKey();
             if (!apiKey) {
-                setError("API Key is missing. Please check your deployment settings.");
+                setError("API Key is missing. Please ensure `API_KEY` is set in your environment variables or .env file.");
                 setMessages([{
                     role: 'model',
                     text: "I cannot connect because the API Key is missing from the environment settings."

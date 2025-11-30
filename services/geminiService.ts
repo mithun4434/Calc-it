@@ -8,25 +8,40 @@ declare const __API_KEY__: string | undefined;
 // Lazy initialization getter
 let aiClient: GoogleGenAI | null = null;
 
+/**
+ * Centralized function to find the API Key from any possible source.
+ */
+export function getSystemApiKey(): string | undefined {
+    // 1. Check injected build constant (Highest priority & reliability)
+    if (typeof __API_KEY__ !== 'undefined' && __API_KEY__) {
+        return __API_KEY__;
+    }
+
+    // 2. Check Vite's import.meta.env
+    if ((import.meta as any).env) {
+        const env = (import.meta as any).env;
+        if (env.VITE_API_KEY) return env.VITE_API_KEY;
+        if (env.API_KEY) return env.API_KEY;
+        if (env.GOOGLE_API_KEY) return env.GOOGLE_API_KEY;
+    }
+
+    // 3. Check standard process.env (Legacy/Cloud envs)
+    if (typeof process !== 'undefined' && process.env) {
+        if (process.env.API_KEY) return process.env.API_KEY;
+        if (process.env.GOOGLE_API_KEY) return process.env.GOOGLE_API_KEY;
+        if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+    }
+
+    return undefined;
+}
+
 function getAiClient(): GoogleGenAI {
     if (aiClient) return aiClient;
     
-    // Robust Key Retrieval Strategy
-    // 1. __API_KEY__: Injected by Vite build process (Most reliable)
-    // 2. import.meta.env.VITE_API_KEY: Standard Vite usage
-    // 3. process.env.API_KEY: Legacy/Node env var
-    let apiKey = typeof __API_KEY__ !== 'undefined' ? __API_KEY__ : undefined;
-    
-    if (!apiKey && (import.meta as any).env) {
-        apiKey = (import.meta as any).env.VITE_API_KEY;
-    }
-    
-    if (!apiKey && typeof process !== 'undefined' && process.env) {
-        apiKey = process.env.API_KEY;
-    }
+    const apiKey = getSystemApiKey();
 
     if (!apiKey) {
-        console.error("Critical Error: API Key is missing from all sources (__API_KEY__, import.meta.env, process.env).");
+        console.error("Critical Error: API Key is missing from all sources.");
         throw new Error("API Key is missing. Please ensure `API_KEY` is set in your environment variables or .env file.");
     }
     
