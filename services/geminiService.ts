@@ -256,6 +256,29 @@ export async function solveProblem(problem: string): Promise<Solution> {
     3. Return the result in JSON format with 'answer' and 'steps'.
     4. The 'answer' field should be the final concise result.`;
 
+    // Global Rate Limiter to prevent hitting 15 RPM limit
+    // We use a simple queue to ensure at least 4 seconds between requests
+    const MIN_REQUEST_INTERVAL = 4000; // 4 seconds
+    let lastRequestTime = 0;
+
+    const rateLimitedGenerate = async (modelName: string, content: any, config?: any) => {
+        const now = Date.now();
+        const timeSinceLast = now - lastRequestTime;
+
+        if (timeSinceLast < MIN_REQUEST_INTERVAL) {
+            const wait = MIN_REQUEST_INTERVAL - timeSinceLast;
+            console.log(`Rate Limiting: Waiting ${wait}ms before next request...`);
+            await delay(wait);
+        }
+
+        lastRequestTime = Date.now();
+        return ai.models.generateContent({
+            model: modelName,
+            contents: content,
+            config: config
+        });
+    };
+
     const generateWithRetry = async (modelName: string, content: any, schema?: any) => {
         let retries = 0;
         const maxRetries = 5; // Increased retries
@@ -268,11 +291,9 @@ export async function solveProblem(problem: string): Promise<Solution> {
                     config.responseSchema = schema;
                 }
 
-                return await ai.models.generateContent({
-                    model: modelName,
-                    contents: content,
-                    config: Object.keys(config).length > 0 ? config : undefined
-                });
+                // Use the rate limited executor
+                return await rateLimitedGenerate(modelName, content, Object.keys(config).length > 0 ? config : undefined);
+
             } catch (e: any) {
                 const isQuota = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('503');
                 if (isQuota && retries < maxRetries) {
