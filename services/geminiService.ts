@@ -37,40 +37,52 @@ export function getSystemApiKey(): string | undefined {
 
 function getAiClient(): GoogleGenAI {
     if (aiClient) return aiClient;
-    
+
     const apiKey = getSystemApiKey();
 
     if (!apiKey) {
         console.error("Critical Error: API Key is missing from all sources.");
         throw new Error("API Key is missing. Please ensure `API_KEY` is set in your environment variables or .env file.");
     }
-    
+
     aiClient = new GoogleGenAI({ apiKey });
     return aiClient;
 }
+
+const DEMO_SOLUTION: Solution = {
+    answer: "This is a DEMO response.\n\nPlease set your valid GEMINI_API_KEY in .env.local to get real answers.",
+    steps: [
+        "The application is currently running in Demo Mode.",
+        "To fix this, open the .env.local file in your project folder.",
+        "Replace 'PLACEHOLDER_API_KEY' with your actual Google Gemini API Key.",
+        "Restart the application."
+    ],
+    calculationSteps: ["Demo Mode = Active"],
+    scalarAnswer: 42
+};
 
 /**
  * Parses raw error objects from Gemini
  */
 function formatGenAIError(error: any): Error {
     let msg = error.message || String(error);
-    
+
     try {
         if (msg.includes('{') && msg.includes('}')) {
-             const match = msg.match(/(\{.*\})/);
-             if (match) {
-                 const parsed = JSON.parse(match[1]);
-                 if (parsed.error && parsed.error.message) {
-                     msg = parsed.error.message;
-                 } else if (parsed.message) {
-                     msg = parsed.message;
-                 }
-             }
+            const match = msg.match(/(\{.*\})/);
+            if (match) {
+                const parsed = JSON.parse(match[1]);
+                if (parsed.error && parsed.error.message) {
+                    msg = parsed.error.message;
+                } else if (parsed.message) {
+                    msg = parsed.message;
+                }
+            }
         }
     } catch (e) {
         // Failed to parse, use original message
     }
-    
+
     // User friendly messages
     if (msg.includes("API Key") || msg.includes("API_KEY")) return new Error("Server configuration error: API Key missing or invalid.");
     if (msg.includes("429") || msg.includes("quota")) return new Error("Quota exceeded. Please wait a moment before trying again.");
@@ -91,32 +103,32 @@ function parseGeminiJsonResponse<T>(responseText: string | undefined): T {
     // 1. Try direct parse
     try {
         return JSON.parse(responseText);
-    } catch (e) {}
+    } catch (e) { }
 
     // 2. Try removing markdown code blocks
     let cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     try {
         return JSON.parse(cleanText);
-    } catch (e) {}
+    } catch (e) { }
 
     // 3. Regex extraction
     const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
         try {
             return JSON.parse(jsonMatch[0]);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     throw new Error("Failed to parse JSON response");
 }
 
 const fileToGenerativePart = (base64Data: string, mimeType: string) => {
-  return {
-    inlineData: {
-      data: base64Data,
-      mimeType,
-    },
-  };
+    return {
+        inlineData: {
+            data: base64Data,
+            mimeType,
+        },
+    };
 };
 
 /**
@@ -125,7 +137,7 @@ const fileToGenerativePart = (base64Data: string, mimeType: string) => {
  */
 function solveArithmeticLocally(problem: string): Solution | null {
     let cleanExpr = problem.toLowerCase().trim();
-    
+
     // 1. Sanitize and Normalize
     cleanExpr = cleanExpr
         .replace(/×/g, '*')
@@ -144,7 +156,7 @@ function solveArithmeticLocally(problem: string): Solution | null {
     // 2. Security Check: Only allow numbers, operators, parens, and "Math." properties
     // This prevents arbitrary code execution while allowing math
     const safeRegex = /^[0-9+\-*/().\s]|Math\.[a-z0-9]+$/i;
-    
+
     // Quick heuristic: If it contains letters that aren't part of "Math", reject it.
     // We strip "Math." and then check if any letters remain.
     const stripped = cleanExpr.replace(/Math\./g, '');
@@ -182,11 +194,11 @@ export async function extractMathFromImage(imageDataUrl: string): Promise<string
     const ai = getAiClient();
     const [header, data] = imageDataUrl.split(',');
     if (!header || !data) throw new Error('Invalid image data URL format.');
-    
+
     const mimeTypeMatch = header.match(/:(.*?);/);
     if (!mimeTypeMatch || !mimeTypeMatch[1]) throw new Error('Could not extract MIME type.');
     const mimeType = mimeTypeMatch[1];
-    
+
     const imagePart = fileToGenerativePart(data, mimeType);
     const prompt = "Extract the mathematical problem. Return ONLY the text.";
 
@@ -228,9 +240,15 @@ export async function solveProblem(problem: string): Promise<Solution> {
     if (local) return local;
 
     // 2. API Solve
-    // We strictly use gemini-2.5-flash to maximize Rate Limits (Flash is higher than Pro).
+    const apiKey = getSystemApiKey();
+    if (apiKey === 'PLACEHOLDER_API_KEY') {
+        await delay(1000); // Simulate network delay
+        return DEMO_SOLUTION;
+    }
+
+    // We use gemini-2.5-flash as requested.
     // We avoid switching models on error to prevent cascading 429s.
-    
+
     const prompt = `Solve this math/physics problem: "${problem}". 
     
     STRICT INSTRUCTIONS:
@@ -253,31 +271,31 @@ export async function solveProblem(problem: string): Promise<Solution> {
 
     } catch (e: any) {
         const isQuota = e.message?.includes('429') || e.message?.includes('quota');
-        
+
         if (isQuota) {
             console.warn("Quota exceeded. Waiting 2s before retry...");
             await delay(2000); // Smart backoff
         }
 
         // Attempt 2: Fallback to Text Mode (lighter request)
-        // We reuse the Flash model.
+        // We reuse the Pro model.
         try {
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: `Solve this problem step-by-step: ${problem}`,
             });
-            
+
             let rawText = "";
             if (response.text) {
                 rawText = response.text;
             } else if (response.candidates && response.candidates.length > 0) {
-                 if (response.candidates[0].content && response.candidates[0].content.parts) {
+                if (response.candidates[0].content && response.candidates[0].content.parts) {
                     rawText = response.candidates[0].content.parts.map(p => p.text).join('\n');
-                 }
+                }
             }
 
             if (!rawText) throw new Error("No response generated.");
-            
+
             return {
                 answer: "Solution found:",
                 steps: rawText.split('\n').filter(line => line.trim().length > 0),
@@ -292,7 +310,7 @@ export async function solveProblem(problem: string): Promise<Solution> {
 
 export async function solveCalculusProblem(type: string, details: any): Promise<Solution> {
     const d = details;
-    const problem = type === 'integration' 
+    const problem = type === 'integration'
         ? `Integrate ${d.expression} variable ${d.variable} ${d.lowerBound ? `from ${d.lowerBound} to ${d.upperBound}` : ''}`
         : `Differentiate ${d.expression} variable ${d.variable}`;
     return solveProblem(problem);

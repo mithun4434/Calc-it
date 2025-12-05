@@ -33,9 +33,9 @@ const MITChat: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const aiRef = useRef<GoogleGenAI | null>(null);
-    
+
     // Track the current model being used
-    const [currentModel, setCurrentModel] = useState<'gemini-3-pro-preview' | 'gemini-2.5-flash'>('gemini-3-pro-preview');
+    const [currentModel, setCurrentModel] = useState<'gemini-2.5-flash' | 'gemini-1.5-flash'>('gemini-2.5-flash');
 
     // Initialize AI and Chat
     useEffect(() => {
@@ -53,7 +53,7 @@ const MITChat: React.FC = () => {
             try {
                 aiRef.current = new GoogleGenAI({ apiKey });
                 const chatSession = aiRef.current.chats.create({
-                    model: 'gemini-3-pro-preview',
+                    model: 'gemini-2.5-flash',
                     config: {
                         systemInstruction: systemInstruction,
                     },
@@ -73,7 +73,7 @@ const MITChat: React.FC = () => {
         };
         initChat();
     }, []);
-    
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
@@ -116,7 +116,7 @@ const MITChat: React.FC = () => {
             .filter((m, i) => i > 0 && m.text) // Skip index 0 (welcome)
             .map(m => ({
                 role: m.role,
-                parts: [{ text: m.text }] 
+                parts: [{ text: m.text }]
             }));
     };
 
@@ -126,11 +126,11 @@ const MITChat: React.FC = () => {
 
         const userMessageText = inputValue.trim();
         const userImage = imageToSend;
-        
+
         // Add user message to UI immediately
         const userMessage: Message = { role: 'user', text: userMessageText, image: userImage || undefined };
         setMessages(prev => [...prev, userMessage, { role: 'model', text: '' }]);
-        
+
         setInputValue('');
         setImageToSend(null);
         setIsLoading(true);
@@ -171,23 +171,23 @@ const MITChat: React.FC = () => {
                 }
             } catch (error: any) {
                 console.warn(`Chat Error (Model: ${currentModel}):`, error);
-                
+
                 // If this wasn't a retry and we are on the Pro model, try falling back to Flash
-                if (!isRetry && currentModel === 'gemini-3-pro-preview' && aiRef.current) {
-                    console.log("Attempting fallback to gemini-2.5-flash...");
-                    
+                if (!isRetry && currentModel === 'gemini-2.5-flash' && aiRef.current) {
+                    console.log("Attempting fallback to gemini-1.5-flash...");
+
                     try {
                         // Create new chat with history
-                        const history = getHistoryForFallback(messages); 
+                        const history = getHistoryForFallback(messages);
                         const fallbackChat = aiRef.current.chats.create({
-                            model: 'gemini-2.5-flash',
+                            model: 'gemini-1.5-flash',
                             config: { systemInstruction: systemInstruction },
                             history: history
                         });
-                        
+
                         setChat(fallbackChat);
-                        setCurrentModel('gemini-2.5-flash');
-                        
+                        setCurrentModel('gemini-1.5-flash');
+
                         // Retry sending the message with the new chat
                         await executeSendMessage(fallbackChat, true);
                         return;
@@ -227,15 +227,14 @@ const MITChat: React.FC = () => {
     return (
         <div className="glass-panel w-full max-w-lg mx-auto p-3 sm:p-4 rounded-3xl flex flex-col h-full">
             <h2 className="text-2xl font-bold text-center mb-4">MIT</h2>
-            
+
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                 {messages.map((msg, index) => (
                     <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs md:max-w-md p-3 rounded-2xl break-words ${
-                            msg.role === 'user' 
-                                ? 'bg-black/10 dark:bg-white/10' 
-                                : 'bg-black/5 dark:bg-black/20'
-                        }`}>
+                        <div className={`max-w-xs md:max-w-md p-3 rounded-2xl break-words ${msg.role === 'user'
+                            ? 'bg-black/10 dark:bg-white/10'
+                            : 'bg-black/5 dark:bg-black/20'
+                            }`}>
                             {msg.image && (
                                 <img src={msg.image} alt="User upload" className="rounded-lg mb-2 max-w-full h-auto" />
                             )}
@@ -253,7 +252,7 @@ const MITChat: React.FC = () => {
             </div>
 
             <div className="mt-4">
-                 {imageToSend && (
+                {imageToSend && (
                     <div className="relative mb-2 w-24 h-24 p-1 border border-current/20 rounded-lg">
                         <img src={imageToSend} alt="Preview" className="w-full h-full object-cover rounded-md" />
                         <button
