@@ -247,7 +247,6 @@ export async function solveProblem(problem: string): Promise<Solution> {
     }
 
     // We use gemini-2.5-flash as requested.
-    // We avoid switching models on error to prevent cascading 429s.
 
     const prompt = `Solve this math/physics problem: "${problem}". 
     
@@ -257,33 +256,49 @@ export async function solveProblem(problem: string): Promise<Solution> {
     3. Return the result in JSON format with 'answer' and 'steps'.
     4. The 'answer' field should be the final concise result.`;
 
+    const generateWithRetry = async (modelName: string, content: any, schema?: any) => {
+        let retries = 0;
+        const maxRetries = 5; // Increased retries
+
+        while (true) {
+            try {
+                const config: any = {};
+                if (schema) {
+                    config.responseMimeType = "application/json";
+                    config.responseSchema = schema;
+                }
+
+                return await ai.models.generateContent({
+                    model: modelName,
+                    contents: content,
+                    config: Object.keys(config).length > 0 ? config : undefined
+                });
+            } catch (e: any) {
+                const isQuota = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('503');
+                if (isQuota && retries < maxRetries) {
+                    retries++;
+                    // Aggressive backoff: 2s, 4s, 8s, 16s, 32s
+                    const waitTime = 2000 * Math.pow(2, retries - 1);
+                    console.warn(`Quota limit hit for ${modelName}. Retrying in ${waitTime / 1000}s... (Attempt ${retries}/${maxRetries})`);
+                    await delay(waitTime);
+                    continue;
+                }
+                throw e;
+            }
+        }
+    };
+
     try {
-        // Attempt 1: Structured JSON
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: solutionSchema,
-            },
-        });
+        // Attempt 1: Structured JSON with requested model
+        const response = await generateWithRetry('gemini-2.5-flash', prompt, solutionSchema);
         return parseGeminiJsonResponse<Solution>(response.text);
 
     } catch (e: any) {
-        const isQuota = e.message?.includes('429') || e.message?.includes('quota');
+        // If structured JSON fails, try Text Mode with SAME model
+        console.warn("Structured mode failed, attempting text mode with gemini-2.5-flash...");
 
-        if (isQuota) {
-            console.warn("Quota exceeded. Waiting 2s before retry...");
-            await delay(2000); // Smart backoff
-        }
-
-        // Attempt 2: Fallback to Text Mode (lighter request)
-        // We reuse the Pro model.
         try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Solve this problem step-by-step: ${problem}`,
-            });
+            const response = await generateWithRetry('gemini-2.5-flash', `Solve this problem step-by-step: ${problem}`);
 
             let rawText = "";
             if (response.text) {
